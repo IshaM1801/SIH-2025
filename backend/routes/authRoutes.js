@@ -1,20 +1,12 @@
-// backend/routes/authRoutes.js
 const express = require("express");
 const router = express.Router();
 const authController = require("../controllers/authController");
-//routes
-// Register (with email verification)
+
 router.post("/register", authController.register);
-
-// Login
+router.get("/verify-email", authController.verifyEmail); // new verification route
 router.post("/login", authController.login);
-
-// Verify token
-router.get("/verify", authController.verifyToken);
+router.get("/verify-token", authController.verifyToken);
+router.post("/reset-password-request", authController.requestPasswordReset);
+router.post("/reset-password", authController.updatePassword);
 
 module.exports = router;
-// Password reset request
-router.post("/reset-password-request", authController.requestPasswordReset);
-
-// Password update
-router.post("/reset-password", authController.updatePassword);

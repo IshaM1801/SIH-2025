@@ -2,7 +2,7 @@ require("dotenv").config();
 const { createClient } = require("@supabase/supabase-js");
 
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_ANON_KEY;
+const supabaseKey = process.env.SUPABASE_SERVICE_KEY; // service role key for backend
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // ------------------ USER REGISTRATION ------------------
@@ -30,7 +30,7 @@ const register = async (req, res) => {
       password,
       options: {
         emailRedirectTo:
-          process.env.EMAIL_REDIRECT_URL || "http://localhost:5174/verify",
+          process.env.BACKEND_URL + "/auth/verify-email", // redirect to backend verify route
       },
     });
 
@@ -55,6 +55,30 @@ const register = async (req, res) => {
   }
 };
 
+// ------------------ EMAIL VERIFICATION ------------------
+const verifyEmail = async (req, res) => {
+  const token = req.query.access_token;
+
+  if (!token) return res.status(400).send("Missing access token");
+
+  try {
+    const { data, error } = await supabase.auth.updateUser({ email_confirm: token });
+
+    if (error) {
+      console.error("Email verification failed:", error.message);
+      return res.status(400).send("Email verification failed: " + error.message);
+    }
+
+    console.log("Email verified:", data);
+
+    // Redirect to frontend login page
+    res.redirect(process.env.FRONTEND_URL + "/login?verified=true");
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Server error during email verification");
+  }
+};
+
 // ------------------ LOGIN ------------------
 const login = async (req, res) => {
   const { email, password, role } = req.body;
@@ -64,14 +88,9 @@ const login = async (req, res) => {
 
   try {
     if (role === "user") {
-      // User login via Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ email, password });
       if (authError) return res.status(400).json({ error: authError.message });
 
-      // Fetch user profile
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("*")
@@ -87,7 +106,6 @@ const login = async (req, res) => {
         profile,
       });
     } else if (role === "employee") {
-      // Employee login via employee_registry
       const { data: empData, error: empError } = await supabase
         .from("employee_registry")
         .select("*")
@@ -133,8 +151,7 @@ const requestPasswordReset = async (req, res) => {
 
   try {
     const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo:
-        process.env.PASSWORD_RESET_REDIRECT || "http://localhost:5174/reset-password",
+      redirectTo: process.env.PASSWORD_RESET_REDIRECT || process.env.FRONTEND_URL + "/reset-password",
     });
 
     if (error) return res.status(400).json({ error: error.message });
@@ -163,6 +180,7 @@ const updatePassword = async (req, res) => {
 module.exports = {
   supabase,
   register,
+  verifyEmail, // added verification
   login,
   verifyToken,
   requestPasswordReset,

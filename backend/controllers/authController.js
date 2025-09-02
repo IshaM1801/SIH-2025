@@ -8,27 +8,33 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 // ------------------ REGISTER USER/EMPLOYEE ------------------
 const register = async (req, res) => {
-  const { email, password, role, emp_id, emp_password, name, emp_dept } = req.body;
+  const { email, password, role, emp_id, name } = req.body;
 
   try {
-    // Use emp_password for employees
-    const finalPassword = role === "employee" ? emp_password : password;
+    if (!email || !password) return res.status(400).json({ error: "Missing email or password" });
 
-    // 1️⃣ Create Supabase Auth user
+    // 1️⃣ Supabase Auth signup
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
-      password: finalPassword,
+      password,
       options: {
         emailRedirectTo: process.env.EMAIL_REDIRECT_URL || "http://localhost:3000/verify",
       },
     });
     if (authError) return res.status(400).json({ error: authError.message });
 
-    // 2️⃣ Insert into employee_registry if role is employee
+    // 2️⃣ Employee registration in employee_registry
     if (role === "employee") {
-      const { data: empData, error: empError } = await supabase
-        .from("employee_registry")
-        .insert([{ emp_id, dept_name: emp_dept, emp_password }]);
+      if (!emp_id || !name )
+        return res.status(400).json({ error: "Missing employee fields" });
+
+      const { data: empData, error: empError } = await supabase.from("employee_registry").insert([
+        {
+          emp_id,
+          
+          emp_password: password,
+        },
+      ]);
       if (empError) return res.status(400).json({ error: empError.message });
     }
 
@@ -39,7 +45,6 @@ const register = async (req, res) => {
         name,
         role,
         emp_id: role === "employee" ? emp_id : null,
-        emp_dept: role === "employee" ? emp_dept : null,
       },
     ]);
     if (profileError) return res.status(400).json({ error: profileError.message });
@@ -56,41 +61,31 @@ const register = async (req, res) => {
 
 // ------------------ LOGIN ------------------
 const login = async (req, res) => {
-  const { emp_id, password } = req.body;
+  const { email, password } = req.body;
 
   try {
-    // 1️⃣ Check employee_registry table first
+    if (!email || !password) return res.status(400).json({ error: "Missing email or password" });
+
+    // 1️⃣ Check employee_registry first
     const { data: employeeData, error: empError } = await supabase
       .from("employee_registry")
       .select("*")
-      .eq("emp_id", emp_id)
+      .eq("emp_id", email) // optionally login with emp_id or email
       .single();
 
     if (empError && empError.code !== "PGRST116") return res.status(500).json({ error: empError.message });
 
     if (employeeData) {
-      // Plain-text password check
       if (password !== employeeData.emp_password) return res.status(401).json({ error: "Invalid credentials" });
-
-      // Get employee profile info
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("emp_id", emp_id)
-        .single();
 
       return res.json({
         message: "Employee login successful",
-        employee: {
-          emp_id: employeeData.emp_id,
-          dept_name: employeeData.dept_name,
-          profile: profileData || null,
-        },
+        employee: employeeData,
       });
     }
 
     // 2️⃣ Fallback to Supabase normal user login
-    const { data, error } = await supabase.auth.signInWithPassword({ email: emp_id, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return res.status(400).json({ error: error.message });
 
     if (!data.user?.email_confirmed_at)
@@ -122,6 +117,8 @@ const requestPasswordReset = async (req, res) => {
   const { email } = req.body;
 
   try {
+    if (!email) return res.status(400).json({ error: "Missing email" });
+
     const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: process.env.PASSWORD_RESET_REDIRECT || "http://localhost:3000/reset-password",
     });
@@ -138,6 +135,8 @@ const updatePassword = async (req, res) => {
   const { newPassword } = req.body;
 
   try {
+    if (!newPassword) return res.status(400).json({ error: "Missing new password" });
+
     const { data, error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) return res.status(400).json({ error: error.message });
 

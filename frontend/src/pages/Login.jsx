@@ -4,63 +4,45 @@ import React, { useState } from "react";
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState(""); // "user" | "employee"
+  const [role, setRole] = useState("");
   const [empId, setEmpId] = useState("");
   const [empPassword, setEmpPassword] = useState("");
   const [name, setName] = useState("");
-  const [empDept, setEmpDept] = useState("");
   const [message, setMessage] = useState("");
-  const [mode, setMode] = useState("login"); // "login" | "register" | "reset"
+  const [mode, setMode] = useState("login");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage("");
 
     try {
-      let url;
-      let body;
+      let url, body;
 
       if (mode === "login") {
-        if (!email || !password) {
-          setMessage("⚠️ Please enter email and password");
-          return;
-        }
+        if (!email || !password) return setMessage("⚠️ Please enter email and password");
         url = "http://localhost:5001/auth/login";
         body = { email, password };
       } else if (mode === "register") {
-        if (!email) {
-          setMessage("⚠️ Please enter your email");
-          return;
-        }
-
+        if (!email || !name) return setMessage("⚠️ Please fill required fields");
         url = "http://localhost:5001/auth/register";
 
         if (role === "employee") {
-          if (!empId || !empPassword || !name || !empDept) {
-            setMessage("⚠️ Please fill all employee fields");
-            return;
-          }
+          if (!empId || !empPassword )
+            return setMessage("⚠️ Please fill all employee fields");
+
           body = {
             email,
-            password: empPassword, // for Supabase
+            password: empPassword, // required by Supabase
             role,
             emp_id: empId,
-            emp_password: empPassword,
             name,
-            emp_dept: empDept,
           };
         } else {
-          if (!password || !name) {
-            setMessage("⚠️ Please fill all user fields");
-            return;
-          }
+          if (!password) return setMessage("⚠️ Please enter password");
           body = { email, password, role, name };
         }
       } else if (mode === "reset") {
-        if (!email) {
-          setMessage("⚠️ Please enter your email");
-          return;
-        }
+        if (!email) return setMessage("⚠️ Please enter email");
         url = "http://localhost:5001/auth/reset-password-request";
         body = { email };
       }
@@ -73,17 +55,13 @@ export default function LoginPage() {
 
       const data = await res.json();
 
-      if (!res.ok) {
-        setMessage(data.error || "Something went wrong");
-      } else {
-        if (mode === "register") {
-          setMessage("✅ Registration successful! Please check your email.");
-        } else if (mode === "login") {
+      if (!res.ok) setMessage(data.error || "⚠️ Something went wrong");
+      else {
+        if (mode === "register") setMessage("✅ Registration successful! Please check your email.");
+        else if (mode === "login") {
           setMessage("✅ Login successful!");
           localStorage.setItem("token", data.session?.access_token || "");
-        } else if (mode === "reset") {
-          setMessage("📩 Password reset email sent! Check your inbox.");
-        }
+        } else if (mode === "reset") setMessage("📩 Password reset email sent! Check inbox.");
       }
     } catch (err) {
       setMessage("⚠️ Server error");
@@ -101,44 +79,40 @@ export default function LoginPage() {
         </h2>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Name (only register) */}
           {mode === "register" && (
             <input
               type="text"
               placeholder="Full Name"
-              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full px-4 py-2 border rounded-lg"
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
             />
           )}
 
-          {/* Email */}
           <input
             type="email"
             placeholder="Email"
-            className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full px-4 py-2 border rounded-lg"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
           />
 
-          {/* Password */}
           {mode !== "reset" && (role !== "employee" || mode === "login") && (
             <input
               type="password"
               placeholder="Password"
-              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full px-4 py-2 border rounded-lg"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
             />
           )}
 
-          {/* Role selection (register only) */}
           {mode === "register" && (
             <select
-              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full px-4 py-2 border rounded-lg"
               value={role}
               onChange={(e) => setRole(e.target.value)}
               required
@@ -149,13 +123,12 @@ export default function LoginPage() {
             </select>
           )}
 
-          {/* Employee-specific fields */}
           {mode === "register" && role === "employee" && (
             <>
               <input
                 type="text"
                 placeholder="Employee ID"
-                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-4 py-2 border rounded-lg"
                 value={empId}
                 onChange={(e) => setEmpId(e.target.value)}
                 required
@@ -163,25 +136,18 @@ export default function LoginPage() {
               <input
                 type="password"
                 placeholder="Employee Password"
-                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-4 py-2 border rounded-lg"
                 value={empPassword}
                 onChange={(e) => setEmpPassword(e.target.value)}
                 required
               />
-              <input
-                type="text"
-                placeholder="Department"
-                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                value={empDept}
-                onChange={(e) => setEmpDept(e.target.value)}
-                required
-              />
+          
             </>
           )}
 
           <button
             type="submit"
-            className="w-full bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 transition"
+            className="w-full bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700"
           >
             {mode === "login" && "Login"}
             {mode === "register" && "Register"}

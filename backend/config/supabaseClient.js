@@ -1,4 +1,4 @@
-// backend/config/supabaseClient.js
+// backend/config/supabaseClient.js.
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 

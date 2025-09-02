@@ -1,6 +1,6 @@
 // backend/middleware/authMiddleware.js
 const supabase = require('../config/supabaseClient');
-
+//backend/
 async function authMiddleware(req, res, next) {
   try {
     const authHeader = req.headers.authorization || '';

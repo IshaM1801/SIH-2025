@@ -1,4 +1,6 @@
 require("dotenv").config();
+//backend/controllers/authController.js
+
 const { createClient } = require("@supabase/supabase-js");
 
 const supabaseUrl = process.env.SUPABASE_URL;

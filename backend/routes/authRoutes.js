@@ -4,7 +4,7 @@ const router = express.Router();
 const authController = require("../controllers/authController");
 
 // ------------------ AUTH ROUTES ------------------
-
+//backend/
 // Register (user or employee)
 router.post("/register", authController.register);
 

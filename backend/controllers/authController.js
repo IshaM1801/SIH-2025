@@ -2,7 +2,7 @@ require("dotenv").config();
 const { createClient } = require("@supabase/supabase-js");
 
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_ANON_KEY;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY; // Must be service role key
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // ------------------ REGISTER ------------------
@@ -12,38 +12,52 @@ const register = async (req, res) => {
   if (!name || !email || !password || !phone)
     return res.status(400).json({ error: "Missing required fields" });
 
+  if (password.length < 6)
+    return res.status(400).json({ error: "Password must be at least 6 characters" });
+
   try {
     // Check if profile already exists
-    const { data: existingUser } = await supabase
+    const { data: existingProfile, error: checkError } = await supabase
       .from("profiles")
       .select("auth_id")
       .eq("email", email)
       .maybeSingle();
 
-    if (existingUser)
-      return res.status(400).json({ error: "Email already registered" });
+    if (checkError) {
+      console.log("Check profile error:", checkError);
+      return res.status(500).json({ error: "Server error checking profile" });
+    }
 
-    // Create user in Supabase Auth
-    const { data: authData, error: authError } = await supabase.auth.signUp({
+    if (existingProfile) return res.status(400).json({ error: "Email already registered" });
+
+    // Step 1: Create user in Supabase Auth
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email,
       password,
+      email_confirm: true, // optional, automatically confirms email
     });
 
-    if (authError) return res.status(400).json({ error: authError.message });
+    if (authError) {
+      console.log("Supabase createUser error:", authError);
+      return res.status(400).json({ error: authError.message });
+    }
 
-    const userId = authData.user.id;
+    const auth_id = authData.user.id;
 
-    // Immediately create profile in profiles table
+    // Step 2: Insert profile immediately
     const { data: profileData, error: insertError } = await supabase
       .from("profiles")
-      .insert([{ auth_id: userId, name, phone, email }])
+      .insert([{ auth_id, name, email, phone }])
       .maybeSingle();
 
-    if (insertError) return res.status(400).json({ error: insertError.message });
+    if (insertError) {
+      console.log("Insert profile error:", insertError);
+      return res.status(400).json({ error: insertError.message });
+    }
 
     res.json({
-      message: "✅ Registration successful! Profile created.",
-      user: { id: userId, email },
+      message: "✅ Registration successful! Profile created immediately.",
+      user: { id: auth_id, email },
       profile: profileData,
     });
   } catch (err) {
@@ -61,9 +75,10 @@ const login = async (req, res) => {
 
   try {
     if (role === "user") {
-      const { data: authData, error: authError } =
-        await supabase.auth.signInWithPassword({ email, password });
-
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
       if (authError) return res.status(400).json({ error: authError.message });
 
       // Fetch profile
@@ -74,7 +89,7 @@ const login = async (req, res) => {
         .maybeSingle();
 
       return res.json({
-        message: `✅ Welcome ${profile.name}!`,
+        message: `✅ Welcome ${profile?.name || "User"}!`,
         user: authData.user,
         profile,
       });
@@ -101,9 +116,4 @@ const login = async (req, res) => {
   }
 };
 
-// ------------------ EXPORT ------------------
-module.exports = {
-  supabase,
-  register,
-  login,
-};
+module.exports = { supabase, register, login };

@@ -2,62 +2,51 @@ require("dotenv").config();
 const { createClient } = require("@supabase/supabase-js");
 
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY; // Must be service role key
+const supabaseKey = process.env.SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// ------------------ REGISTER ------------------
+// ------------------ USER REGISTRATION ------------------
 const register = async (req, res) => {
   const { name, email, password, phone } = req.body;
 
-  if (!name || !email || !password || !phone)
+  if (!name || !email || !password || !phone) {
     return res.status(400).json({ error: "Missing required fields" });
-
-  if (password.length < 6)
-    return res.status(400).json({ error: "Password must be at least 6 characters" });
+  }
 
   try {
     // Check if profile already exists
-    const { data: existingProfile, error: checkError } = await supabase
+    const { data: existingProfile } = await supabase
       .from("profiles")
       .select("auth_id")
       .eq("email", email)
       .maybeSingle();
 
-    if (checkError) {
-      console.log("Check profile error:", checkError);
-      return res.status(500).json({ error: "Server error checking profile" });
-    }
+    if (existingProfile)
+      return res.status(400).json({ error: "Email already registered" });
 
-    if (existingProfile) return res.status(400).json({ error: "Email already registered" });
-
-    // Step 1: Create user in Supabase Auth
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+    // Sign up user in Supabase Auth
+    const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
-      email_confirm: true, // optional, automatically confirms email
+      options: {
+        emailRedirectTo:
+          process.env.EMAIL_REDIRECT_URL || "http://localhost:5174/verify",
+      },
     });
 
-    if (authError) {
-      console.log("Supabase createUser error:", authError);
-      return res.status(400).json({ error: authError.message });
-    }
+    if (authError) return res.status(400).json({ error: authError.message });
 
-    const auth_id = authData.user.id;
-
-    // Step 2: Insert profile immediately
-    const { data: profileData, error: insertError } = await supabase
+    // Insert profile immediately after signup
+    const { data: profileData, error: profileError } = await supabase
       .from("profiles")
-      .insert([{ auth_id, name, email, phone }])
+      .insert([{ auth_id: authData.user.id, name, email, phone }])
       .maybeSingle();
 
-    if (insertError) {
-      console.log("Insert profile error:", insertError);
-      return res.status(400).json({ error: insertError.message });
-    }
+    if (profileError) return res.status(400).json({ error: profileError.message });
 
     res.json({
-      message: "✅ Registration successful! Profile created immediately.",
-      user: { id: auth_id, email },
+      message: "✅ Registration successful! Please verify your email before login.",
+      user: authData.user,
       profile: profileData,
     });
   } catch (err) {
@@ -75,25 +64,30 @@ const login = async (req, res) => {
 
   try {
     if (role === "user") {
+      // User login via Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
       if (authError) return res.status(400).json({ error: authError.message });
 
-      // Fetch profile
-      const { data: profile } = await supabase
+      // Fetch user profile
+      const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("*")
         .eq("auth_id", authData.user.id)
         .maybeSingle();
 
+      if (!profile || profileError)
+        return res.status(400).json({ error: "Profile not found" });
+
       return res.json({
-        message: `✅ Welcome ${profile?.name || "User"}!`,
+        message: `✅ Welcome ${profile.name}!`,
         user: authData.user,
         profile,
       });
     } else if (role === "employee") {
+      // Employee login via employee_registry
       const { data: empData, error: empError } = await supabase
         .from("employee_registry")
         .select("*")
@@ -112,8 +106,65 @@ const login = async (req, res) => {
       return res.status(400).json({ error: "Invalid role specified" });
     }
   } catch (err) {
+    console.error("Login error:", err);
     res.status(500).json({ error: err.message });
   }
 };
 
-module.exports = { supabase, register, login };
+// ------------------ VERIFY TOKEN ------------------
+const verifyToken = async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) return res.status(401).json({ error: "No token provided" });
+
+    const { data, error } = await supabase.auth.getUser(token);
+    if (error) return res.status(401).json({ error: error.message });
+
+    res.json({ user: data.user });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ------------------ PASSWORD RESET ------------------
+const requestPasswordReset = async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: "Missing email" });
+
+  try {
+    const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo:
+        process.env.PASSWORD_RESET_REDIRECT || "http://localhost:5174/reset-password",
+    });
+
+    if (error) return res.status(400).json({ error: error.message });
+
+    res.json({ message: "Password reset email sent!" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ------------------ UPDATE PASSWORD ------------------
+const updatePassword = async (req, res) => {
+  const { newPassword } = req.body;
+  if (!newPassword) return res.status(400).json({ error: "Missing new password" });
+
+  try {
+    const { data, error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) return res.status(400).json({ error: error.message });
+
+    res.json({ message: "Password updated successfully!" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+module.exports = {
+  supabase,
+  register,
+  login,
+  verifyToken,
+  requestPasswordReset,
+  updatePassword,
+};

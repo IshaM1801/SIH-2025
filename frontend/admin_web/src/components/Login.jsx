@@ -1,3 +1,4 @@
+// frontend/src/pages/Login.jsx
 import React, { useState } from "react";
 
 export default function LoginPage() {
@@ -5,31 +6,30 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [role, setRole] = useState(""); // user | employee
-  const [mode, setMode] = useState("login");
+  const [role, setRole] = useState(""); // "user" | "employee"
+  const [mode, setMode] = useState("login"); // "login" | "register"
   const [message, setMessage] = useState("");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage("");
 
-    if (!email || !password || !role) return setMessage("⚠️ Please fill all required fields");
-
     try {
       let url = "";
-      let body = { email, password, role };
+      let body = {};
 
-      if (mode === "register") {
+      if (mode === "login") {
+        if (!email || !password || !role) return setMessage("⚠️ Please fill all fields");
+        url = "http://localhost:5001/auth/login";
+        body = { email, password, role };
+      } else if (mode === "register") {
         if (role === "user") {
-          if (!name || !phone) return setMessage("⚠️ Please provide name and phone");
+          if (!name || !phone || !email || !password) return setMessage("⚠️ Please fill all fields");
           url = "http://localhost:5001/auth/register";
           body = { name, phone, email, password };
         } else {
-          return setMessage("⚠️ Employee registration not allowed");
+          return setMessage("⚠️ Employee cannot register");
         }
-      } else if (mode === "login") {
-        url = "http://localhost:5001/auth/login";
-        body = role === "user" ? { email, password, role } : { email, password, role };
       }
 
       const res = await fetch(url, {
@@ -40,21 +40,20 @@ export default function LoginPage() {
 
       const data = await res.json();
 
-      if (!res.ok) {
-        setMessage(data.error || "⚠️ Something went wrong");
-      } else {
+      if (!res.ok) setMessage(data.error || "⚠️ Something went wrong");
+      else {
         if (mode === "login") {
           if (role === "user") {
-            setMessage(`✅ Welcome ${data.profile?.name || data.user?.email}`);
+            const userName = data.profile?.name || "User";
+            setMessage(`✅ Welcome ${userName}!`);
             localStorage.setItem("token", data.user?.access_token || "");
           } else if (role === "employee") {
-            setMessage(`✅ Welcome ${data.employee.name} to the Department of ${data.employee.dept_name}`);
+            const empName = data.employee?.name || "Employee";
+            const dept = data.employee?.dept_name || "";
+            setMessage(`✅ Welcome ${empName} to the Department of ${dept}`);
           }
         } else if (mode === "register") {
-          // Store name and phone for verification
-          localStorage.setItem("name", name);
-          localStorage.setItem("phone", phone);
-          setMessage("✅ Registration successful! Please verify your email before login.");
+          setMessage("✅ Registration successful! Please check your email before logging in.");
           setMode("login");
         }
       }
@@ -67,7 +66,9 @@ export default function LoginPage() {
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-100">
       <div className="w-full max-w-md p-6 bg-white rounded-2xl shadow-lg">
-        <h2 className="text-2xl font-bold text-center mb-6">{mode === "login" ? "Login" : "Register"}</h2>
+        <h2 className="text-2xl font-bold text-center mb-6">
+          {mode === "login" ? "Login" : "Register"}
+        </h2>
 
         <div className="flex justify-between mb-4">
           <button

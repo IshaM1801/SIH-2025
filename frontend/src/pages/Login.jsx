@@ -4,45 +4,33 @@ import React, { useState } from "react";
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
   const [role, setRole] = useState(""); // "user" | "employee"
-  const [empId, setEmpId] = useState("");
-  const [name, setName] = useState(""); // Employee/User name
+  const [mode, setMode] = useState("login"); // "login" | "register"
   const [message, setMessage] = useState("");
-  const [mode, setMode] = useState("login"); // "login" | "register" | "reset"
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage("");
 
     try {
-      let url, body;
+      let url = "";
+      let body = {};
 
       if (mode === "login") {
-        if (!email || !password) return setMessage("⚠️ Please enter email and password");
+        if (!email || !password || !role) return setMessage("⚠️ Please fill all fields");
         url = "http://localhost:5001/auth/login";
-
-        if (role === "employee") {
-          if (!empId) return setMessage("⚠️ Please enter Employee ID");
-          body = { email, emp_id: empId, password, role };
-        } else {
-          body = { email, password, role };
-        }
+        body = { email, password, role };
       } else if (mode === "register") {
-        if (!email || !password) return setMessage("⚠️ Please enter email and password");
-        url = "http://localhost:5001/auth/register";
-
-        if (role === "employee") {
-          if (!empId) return setMessage("⚠️ Please enter Employee ID");
-          if (!name) return setMessage("⚠️ Please enter Employee Name");
-          body = { email, emp_id: empId, password, role, name };
+        if (role === "user") {
+          if (!name || !phone || !email || !password) return setMessage("⚠️ Please fill all fields");
+          url = "http://localhost:5001/auth/register";
+          body = { name, phone, email, password };
         } else {
-          if (!name) return setMessage("⚠️ Please enter your name");
-          body = { email, password, name, role };
+          // Employee cannot register
+          return;
         }
-      } else if (mode === "reset") {
-        if (!email) return setMessage("⚠️ Please enter your email");
-        url = "http://localhost:5001/auth/reset-password-request";
-        body = { email };
       }
 
       const res = await fetch(url, {
@@ -55,15 +43,17 @@ export default function LoginPage() {
 
       if (!res.ok) setMessage(data.error || "⚠️ Something went wrong");
       else {
-        if (mode === "register") setMessage("✅ Registration successful! Please check your email.");
-        else if (mode === "login") {
-          setMessage("✅ Login successful!");
-          localStorage.setItem("token", data.session?.access_token || "");
-        } else if (mode === "reset") setMessage("📩 Password reset email sent! Check inbox.");
+        if (mode === "login") {
+          if (role === "user") setMessage(`✅ Welcome ${data.profile.name}`);
+          else setMessage(`✅ Welcome ${data.employee.name} to the Department of ${data.employee.dept_name}`);
+          localStorage.setItem("token", data.user?.access_token || "");
+        } else if (mode === "register") {
+          setMessage("✅ Registration successful! Please check your email before logging in.");
+        }
       }
     } catch (err) {
-      setMessage("⚠️ Server error");
       console.error(err);
+      setMessage("⚠️ Server error");
     }
   };
 
@@ -71,109 +61,100 @@ export default function LoginPage() {
     <div className="flex items-center justify-center min-h-screen bg-gray-100">
       <div className="w-full max-w-md p-6 bg-white rounded-2xl shadow-lg">
         <h2 className="text-2xl font-bold text-center mb-6">
-          {mode === "login" && "Login"}
-          {mode === "register" && "Register"}
-          {mode === "reset" && "Reset Password"}
+          {mode === "login" ? "Login" : "Register"}
         </h2>
 
+        {/* Role toggle buttons */}
+        <div className="flex justify-between mb-4">
+          <button
+            onClick={() => setRole("user")}
+            className={`px-4 py-2 rounded ${role === "user" ? "bg-indigo-600 text-white" : "bg-gray-200"}`}
+          >
+            User
+          </button>
+          <button
+            onClick={() => setRole("employee")}
+            className={`px-4 py-2 rounded ${role === "employee" ? "bg-indigo-600 text-white" : "bg-gray-200"}`}
+          >
+            Employee
+          </button>
+        </div>
+
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Name field (for users & employees during registration) */}
-          {mode === "register" && (
-            <input
-              type="text"
-              placeholder={role === "employee" ? "Employee Name" : "Full Name"}
-              className="w-full px-4 py-2 border rounded-lg"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
+          {/* User registration fields */}
+          {mode === "register" && role === "user" && (
+            <>
+              <input
+                type="text"
+                placeholder="Full Name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full px-4 py-2 border rounded-lg"
+                required
+              />
+              <input
+                type="text"
+                placeholder="Phone Number"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="w-full px-4 py-2 border rounded-lg"
+                required
+              />
+            </>
           )}
 
-          {/* Email */}
+          {/* Email & password */}
           <input
             type="email"
             placeholder="Email"
-            className="w-full px-4 py-2 border rounded-lg"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            className="w-full px-4 py-2 border rounded-lg"
+            required
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full px-4 py-2 border rounded-lg"
             required
           />
 
-          {/* Employee ID field (login/register for employees) */}
-          {(role === "employee" && mode !== "reset") && (
-            <input
-              type="text"
-              placeholder="Employee ID"
-              className="w-full px-4 py-2 border rounded-lg"
-              value={empId}
-              onChange={(e) => setEmpId(e.target.value)}
-              required
-            />
-          )}
-
-          {/* Password */}
-          {mode !== "reset" && (
-            <input
-              type="password"
-              placeholder="Password"
-              className="w-full px-4 py-2 border rounded-lg"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          )}
-
-          {/* Role selection (register only) */}
-          {mode === "register" && (
-            <select
-              className="w-full px-4 py-2 border rounded-lg"
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-              required
+          {/* Submit button */}
+          {!(mode === "register" && role === "employee") && (
+            <button
+              type="submit"
+              className="w-full bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700"
             >
-              <option value="">Select Role</option>
-              <option value="user">User</option>
-              <option value="employee">Employee</option>
-            </select>
+              {mode === "login" ? "Login" : "Register"}
+            </button>
           )}
-
-          <button
-            type="submit"
-            className="w-full bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700"
-          >
-            {mode === "login" && "Login"}
-            {mode === "register" && "Register"}
-            {mode === "reset" && "Send Reset Link"}
-          </button>
         </form>
 
         {message && <p className="mt-4 text-center text-sm text-red-500">{message}</p>}
 
-        {/* Mode toggles */}
-        {mode === "login" && (
-          <p className="mt-6 text-center text-sm text-gray-600">
-            Don't have an account?{" "}
-            <button onClick={() => setMode("register")} className="text-indigo-600 hover:underline">Register</button>
-            <br />
-            <button onClick={() => setMode("reset")} className="text-indigo-600 hover:underline mt-2">Forgot Password?</button>
-          </p>
-        )}
-
-        {mode === "register" && (
-          <p className="mt-6 text-center text-sm text-gray-600">
-            Already have an account?{" "}
-            <button onClick={() => setMode("login")} className="text-indigo-600 hover:underline">Login</button>
-          </p>
-        )}
-
-        {mode === "reset" && (
-          <p className="mt-6 text-center text-sm text-gray-600">
-            Remembered your password?{" "}
-            <button onClick={() => setMode("login")} className="text-indigo-600 hover:underline">Back to Login</button>
-          </p>
-        )}
+        {/* Mode toggle */}
+        <p className="mt-6 text-center text-sm text-gray-600">
+          {mode === "login" ? (
+            <>
+              Don't have an account?{" "}
+              {role !== "employee" && (
+                <button onClick={() => setMode("register")} className="text-indigo-600 hover:underline">
+                  Register
+                </button>
+              )}
+            </>
+          ) : (
+            <>
+              Already have an account?{" "}
+              <button onClick={() => setMode("login")} className="text-indigo-600 hover:underline">
+                Login
+              </button>
+            </>
+          )}
+        </p>
       </div>
     </div>
   );
 }
-//login page.

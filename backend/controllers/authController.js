@@ -5,38 +5,22 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// ------------------ REGISTER ------------------
+// ------------------ USER REGISTRATION ------------------
 const register = async (req, res) => {
-  const { email, password, role, emp_id, name } = req.body;
+  const { name, email, password, phone } = req.body;
 
   try {
-    if (!email || !password || !name)
+    if (!name || !email || !password || !phone) {
       return res.status(400).json({ error: "Missing required fields" });
-
-    let deptName = null;
-
-    // Employee validation
-    if (role === "employee") {
-      if (!emp_id) return res.status(400).json({ error: "Missing employee ID" });
-
-      const empIdQuery = isNaN(emp_id) ? emp_id : Number(emp_id);
-
-      // Fetch employee data safely
-      const { data: empData, error: empError } = await supabase
-        .from("employee_registry")
-        .select("*")
-        .eq("emp_id", empIdQuery)
-        .maybeSingle(); // <- safer than .single() or .limit(1)
-
-      if (empError) return res.status(400).json({ error: "Error fetching employee data" });
-      if (!empData) return res.status(400).json({ error: "Invalid employee ID" });
-
-      // Validate password
-      if (password !== empData.emp_password)
-        return res.status(400).json({ error: "Invalid employee password" });
-
-      deptName = empData.dept_name; // fetch department from registry
     }
+
+    // Check if user already exists
+    const { data: existingUser } = await supabase
+      .from("profiles")
+      .select("auth_id")
+      .eq("email", email)
+      .maybeSingle();
+    if (existingUser) return res.status(400).json({ error: "Email already registered" });
 
     // Supabase Auth signup
     const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -48,81 +32,134 @@ const register = async (req, res) => {
     });
     if (authError) return res.status(400).json({ error: authError.message });
 
-    // Insert into profiles table
-    const { data: profileData, error: profileError } = await supabase.from("profiles").insert([
-      {
-        auth_id: authData.user.id,
-        name,
-        role,
-        emp_id: role === "employee" ? emp_id : null,
-        dept_name: deptName,
-      },
-    ]).maybeSingle(); // <- safer
-
+    // Insert profile
+    const { data: profileData, error: profileError } = await supabase
+      .from("profiles")
+      .insert([{ auth_id: authData.user.id, name, email, phone }])
+      .maybeSingle();
     if (profileError) return res.status(400).json({ error: profileError.message });
+    if (role === "user") {
+  // User login via Supabase
+  const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ email, password });
+  if (authError) return res.status(400).json({ error: authError.message });
+
+  // Fetch user profile
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("auth_id", authData.user.id)
+    .maybeSingle();
+
+  if (!profile || profileError) return res.status(400).json({ error: "Profile not found" });
+
+  return res.json({ 
+    message: `✅ Welcome ${profile.name}!`, // <-- personalized welcome
+    user: authData.user, 
+    profile 
+  });
+}
+
+if (role === "user") {
+  // User login via Supabase
+  const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ email, password });
+  if (authError) return res.status(400).json({ error: authError.message });
+
+  // Fetch user profile
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("auth_id", authData.user.id)
+    .maybeSingle();
+
+  if (!profile || profileError) return res.status(400).json({ error: "Profile not found" });
+
+  return res.json({ 
+    message: `✅ Welcome ${profile.name}!`, // <-- personalized welcome
+    user: authData.user, 
+    profile 
+  });
+}
 
     res.json({
-      message: "Registration successful! Please check your email.",
+      message: "✅ Registration successful! Please confirm your email before logging in.",
       user: authData.user,
       profile: profileData,
     });
-
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 };
 
 // ------------------ LOGIN ------------------
+// ------------------ LOGIN (USER OR EMPLOYEE) ------------------
 const login = async (req, res) => {
-  const { email, password, role, emp_id } = req.body;
+  const { email, password, role, name, phone } = req.body;
 
   try {
-    if (!email || !password) return res.status(400).json({ error: "Missing email or password" });
+    if (!email || !password || !role) {
+      return res.status(400).json({ error: "⚠️ Please fill all required fields" });
+    }
 
-    // Employee login validation
-    if (role === "employee") {
-      if (!emp_id) return res.status(400).json({ error: "Missing employee ID" });
+    if (role === "user") {
+      // User login via Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+      if (authError) return res.status(400).json({ error: authError.message });
 
-      const empIdQuery = isNaN(emp_id) ? emp_id : Number(emp_id);
+      // Check if user profile exists
+      const { data: existingProfile, error: profileError } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("auth_id", authData.user.id)
+        .maybeSingle();
 
+      let profileData = existingProfile;
+
+      // If profile doesn't exist yet (first-time login), insert it
+      if (!existingProfile) {
+        if (!name || !phone) {
+          return res.status(400).json({ error: "⚠️ Please provide your name and phone number" });
+        }
+
+        const { data: newProfile, error: insertError } = await supabase
+          .from("profiles")
+          .insert([{ auth_id: authData.user.id, name, email, phone }])
+          .maybeSingle();
+
+        if (insertError) return res.status(400).json({ error: insertError.message });
+        profileData = newProfile;
+      }
+
+      return res.json({
+        message: `✅ Welcome ${profileData.name}!`, // personalized welcome message
+        user: authData.user,
+        profile: profileData
+      });
+    } else if (role === "employee") {
+      // Employee login via employee_registry
       const { data: empData, error: empError } = await supabase
         .from("employee_registry")
-        .select("emp_password, dept_name")
-        .eq("emp_id", empIdQuery)
-        .maybeSingle(); // <- safer
+        .select("*")
+        .eq("emp_email", email)
+        .maybeSingle();
 
-      if (empError) return res.status(400).json({ error: "Error fetching employee data" });
-      if (!empData) return res.status(400).json({ error: "Invalid employee ID" });
-      if (password !== empData.emp_password) return res.status(401).json({ error: "Invalid employee password" });
+      if (empError) return res.status(400).json({ error: empError.message });
+      if (!empData) return res.status(400).json({ error: "Invalid employee email" });
+      if (empData.password !== password) return res.status(401).json({ error: "Invalid password" });
+
+      return res.json({
+        message: `✅ Welcome ${empData.name} to the Department of ${empData.dept_name}`,
+        employee: empData,
+      });
+
+    } else {
+      return res.status(400).json({ error: "Invalid role specified" });
     }
-
-    // Supabase login
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return res.status(400).json({ error: error.message });
-
-    // Fetch profile info to send name (and department if employee)
-    const { data: profileData, error: profileError } = await supabase
-      .from("profiles")
-      .select("name, emp_id, dept_name")
-      .eq("auth_id", data.user.id)
-      .maybeSingle(); // <- safer
-
-    if (profileError) return res.status(400).json({ error: profileError.message });
-
-    let response = {
-      message: "Login successful",
-      user: data.user,
-      session: data.session,
-      name: profileData?.name || "Unknown",
-    };
-
-    if (role === "employee") {
-      response.dept_name = profileData?.dept_name || "Unknown";
-    }
-
-    res.json(response);
 
   } catch (err) {
+    console.error("Login error:", err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -174,6 +211,7 @@ const updatePassword = async (req, res) => {
   }
 };
 
+// ------------------ EXPORT ------------------
 module.exports = {
   supabase,
   register,

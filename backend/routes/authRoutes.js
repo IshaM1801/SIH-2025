@@ -3,9 +3,7 @@ const express = require("express");
 const router = express.Router();
 const authController = require("../controllers/authController");
 
-// ------------------ AUTH ROUTES ------------------
-//backend/
-// Register (user or employee)
+// Register (with email verification)
 router.post("/register", authController.register);
 
 // Login
@@ -14,10 +12,9 @@ router.post("/login", authController.login);
 // Verify token
 router.get("/verify", authController.verifyToken);
 
+module.exports = router;
 // Password reset request
 router.post("/reset-password-request", authController.requestPasswordReset);
 
-// Update password (after reset link)
+// Password update
 router.post("/reset-password", authController.updatePassword);
-
-module.exports = router;

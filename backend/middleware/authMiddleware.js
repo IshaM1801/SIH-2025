@@ -1,6 +1,6 @@
 // backend/middleware/authMiddleware.js
 const supabase = require('../config/supabaseClient');
-
+//backend/
 async function authMiddleware(req, res, next) {
   try {
     const authHeader = req.headers.authorization || '';
@@ -24,7 +24,7 @@ async function authMiddleware(req, res, next) {
       .from('users')
       .select('id')
       .eq('id', data.user.id)
-      .limit(1);
+      .maybeSingle();
 
     if (fetchErr) {
       console.warn('Warning: error checking users table:', fetchErr);

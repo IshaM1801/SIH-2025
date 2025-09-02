@@ -131,7 +131,7 @@ const login = async (req, res) => {
         if (insertError) return res.status(400).json({ error: insertError.message });
         profileData = newProfile;
       }
-//backend
+//backend.
       return res.json({
         message: `✅ Welcome ${profileData.name}!`, // personalized welcome message
         user: authData.user,

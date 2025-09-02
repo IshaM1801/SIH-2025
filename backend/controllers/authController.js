@@ -2,147 +2,85 @@ require("dotenv").config();
 const { createClient } = require("@supabase/supabase-js");
 
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_KEY; // service role key for backend
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY; // service role key for backend
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // ------------------ USER REGISTRATION ------------------
+// ------------------ USER REGISTRATION ------------------
 const register = async (req, res) => {
-  const { name, email, password, phone } = req.body;
+  const { email, password } = req.body;
 
-  if (!name || !email || !password || !phone) {
-    return res.status(400).json({ error: "Missing required fields" });
-  }
+  if (!email || !password) return res.status(400).json({ error: "Missing fields" });
 
   try {
-    // Check if profile already exists
-    const { data: existingProfile } = await supabase
-      .from("profiles")
-      .select("auth_id")
-      .eq("email", email)
-      .maybeSingle();
-
-    if (existingProfile)
-      return res.status(400).json({ error: "Email already registered" });
-
-    // Sign up user in Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo:
-          process.env.BACKEND_URL + "/auth/verify-email", // redirect to backend verify route
+        emailRedirectTo: "http://localhost:5173/verify", // straight to front-end verify page
       },
     });
 
     if (authError) return res.status(400).json({ error: authError.message });
 
-    // Insert profile immediately after signup
-    const { data: profileData, error: profileError } = await supabase
-      .from("profiles")
-      .insert([{ auth_id: authData.user.id, name, email, phone }])
-      .maybeSingle();
-
-    if (profileError) return res.status(400).json({ error: profileError.message });
-
     res.json({
-      message: "✅ Registration successful! Please verify your email before login.",
-      user: authData.user,
-      profile: profileData,
+      message: "✅ Verification email sent! Check your inbox to verify your email.",
     });
   } catch (err) {
-    console.error("Register error:", err);
     res.status(500).json({ error: err.message });
   }
 };
-
-// ------------------ EMAIL VERIFICATION ------------------
-const verifyEmail = async (req, res) => {
-  const token = req.query.access_token;
-
-  if (!token) return res.status(400).send("Missing access token");
-
-  try {
-    const { data, error } = await supabase.auth.updateUser({ email_confirm: token });
-
-    if (error) {
-      console.error("Email verification failed:", error.message);
-      return res.status(400).send("Email verification failed: " + error.message);
-    }
-
-    console.log("Email verified:", data);
-
-    // Redirect to frontend login page
-    res.redirect(process.env.FRONTEND_URL + "/login?verified=true");
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Server error during email verification");
-  }
-};
-
 // ------------------ LOGIN ------------------
 const login = async (req, res) => {
-  const { email, password, role } = req.body;
+  const { email, password } = req.body;
 
-  if (!email || !password || !role)
+  if (!email || !password)
     return res.status(400).json({ error: "Please fill all required fields" });
 
   try {
-    if (role === "user") {
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ email, password });
-      if (authError) return res.status(400).json({ error: authError.message });
+    // 1. Try employee login first
+    const { data: empData, error: empError } = await supabase
+      .from("employee_registry")
+      .select("*")
+      .eq("emp_email", email)
+      .maybeSingle();
 
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("auth_id", authData.user.id)
-        .maybeSingle();
+    if (empError) return res.status(500).json({ error: empError.message });
 
-      if (!profile || profileError)
-        return res.status(400).json({ error: "Profile not found" });
-
-      return res.json({
-        message: `✅ Welcome ${profile.name}!`,
-        user: authData.user,
-        profile,
-      });
-    } else if (role === "employee") {
-      const { data: empData, error: empError } = await supabase
-        .from("employee_registry")
-        .select("*")
-        .eq("emp_email", email)
-        .maybeSingle();
-
-      if (empError) return res.status(400).json({ error: empError.message });
-      if (!empData) return res.status(400).json({ error: "Invalid employee email" });
-      if (empData.password !== password) return res.status(401).json({ error: "Invalid password" });
+    if (empData) {
+      // Found employee
+      if (empData.password !== password)
+        return res.status(401).json({ error: "Invalid password" });
 
       return res.json({
         message: `✅ Welcome ${empData.name} to the Department of ${empData.dept_name}`,
         employee: empData,
+        type: "employee",
       });
-    } else {
-      return res.status(400).json({ error: "Invalid role specified" });
     }
+
+    // 2. If not employee, try Supabase Auth (normal user)
+    const { data: authData, error: authError } =
+      await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+    if (authError) return res.status(401).json({ error: authError.message });
+
+    return res.json({
+      message: "✅ Welcome!",
+      user: authData.user,
+      type: "user",
+    });
   } catch (err) {
     console.error("Login error:", err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: "Server error", details: err.message });
   }
 };
 
 // ------------------ VERIFY TOKEN ------------------
-const verifyToken = async (req, res) => {
-  try {
-    const token = req.headers.authorization?.split(" ")[1];
-    if (!token) return res.status(401).json({ error: "No token provided" });
 
-    const { data, error } = await supabase.auth.getUser(token);
-    if (error) return res.status(401).json({ error: error.message });
-
-    res.json({ user: data.user });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
 
 // ------------------ PASSWORD RESET ------------------
 const requestPasswordReset = async (req, res) => {
@@ -176,13 +114,65 @@ const updatePassword = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+// ------------------ COMPLETE PROFILE AFTER VERIFICATION ------------------
+const completeProfile = async (req, res) => {
+  const { name, phone } = req.body;
+  if (!name || !phone) {
+    return res.status(400).json({ error: "Missing name or phone" });
+  }
 
+  try {
+    // Fetch all users
+    const { data, error } = await supabase.auth.admin.listUsers();
+    if (error) return res.status(400).json({ error: error.message });
+
+    const users = data?.users || [];
+    if (users.length === 0) {
+      return res.status(400).json({ error: "No users found in Auth" });
+    }
+
+    // ✅ Find latest user by created_at timestamp
+    const latestUser = users.reduce((latest, user) => {
+      return new Date(user.created_at) > new Date(latest.created_at)
+        ? user
+        : latest;
+    }, users[0]);
+
+    if (!latestUser) {
+      return res.status(400).json({ error: "Latest user not found" });
+    }
+
+    // Insert into profiles
+    const { data: profileData, error: profileError } = await supabase
+      .from("profiles")
+      .insert([
+        {
+          auth_id: latestUser.id,
+          email: latestUser.email,
+          name,
+          phone,
+        },
+      ])
+      .select()
+      .single();
+
+    if (profileError) {
+      return res.status(400).json({ error: profileError.message });
+    }
+
+    res.json({
+      message: "Profile created successfully!",
+      profile: profileData,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
 module.exports = {
   supabase,
   register,
-  verifyEmail, // added verification
   login,
-  verifyToken,
   requestPasswordReset,
   updatePassword,
+  completeProfile,
 };

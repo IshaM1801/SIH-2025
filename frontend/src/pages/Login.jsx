@@ -4,12 +4,11 @@ import React, { useState } from "react";
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState("");
+  const [role, setRole] = useState(""); // "user" | "employee"
   const [empId, setEmpId] = useState("");
-  const [empPassword, setEmpPassword] = useState("");
-  const [name, setName] = useState("");
+  const [name, setName] = useState(""); // Employee/User name
   const [message, setMessage] = useState("");
-  const [mode, setMode] = useState("login");
+  const [mode, setMode] = useState("login"); // "login" | "register" | "reset"
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -21,28 +20,27 @@ export default function LoginPage() {
       if (mode === "login") {
         if (!email || !password) return setMessage("⚠️ Please enter email and password");
         url = "http://localhost:5001/auth/login";
-        body = { email, password };
+
+        if (role === "employee") {
+          if (!empId) return setMessage("⚠️ Please enter Employee ID");
+          body = { email, emp_id: empId, password, role };
+        } else {
+          body = { email, password, role };
+        }
       } else if (mode === "register") {
-        if (!email || !name) return setMessage("⚠️ Please fill required fields");
+        if (!email || !password) return setMessage("⚠️ Please enter email and password");
         url = "http://localhost:5001/auth/register";
 
         if (role === "employee") {
-          if (!empId || !empPassword )
-            return setMessage("⚠️ Please fill all employee fields");
-
-          body = {
-            email,
-            password: empPassword, // required by Supabase
-            role,
-            emp_id: empId,
-            name,
-          };
+          if (!empId) return setMessage("⚠️ Please enter Employee ID");
+          if (!name) return setMessage("⚠️ Please enter Employee Name");
+          body = { email, emp_id: empId, password, role, name };
         } else {
-          if (!password) return setMessage("⚠️ Please enter password");
-          body = { email, password, role, name };
+          if (!name) return setMessage("⚠️ Please enter your name");
+          body = { email, password, name, role };
         }
       } else if (mode === "reset") {
-        if (!email) return setMessage("⚠️ Please enter email");
+        if (!email) return setMessage("⚠️ Please enter your email");
         url = "http://localhost:5001/auth/reset-password-request";
         body = { email };
       }
@@ -79,10 +77,11 @@ export default function LoginPage() {
         </h2>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Name field (for users & employees during registration) */}
           {mode === "register" && (
             <input
               type="text"
-              placeholder="Full Name"
+              placeholder={role === "employee" ? "Employee Name" : "Full Name"}
               className="w-full px-4 py-2 border rounded-lg"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -90,6 +89,7 @@ export default function LoginPage() {
             />
           )}
 
+          {/* Email */}
           <input
             type="email"
             placeholder="Email"
@@ -99,7 +99,20 @@ export default function LoginPage() {
             required
           />
 
-          {mode !== "reset" && (role !== "employee" || mode === "login") && (
+          {/* Employee ID field (login/register for employees) */}
+          {(role === "employee" && mode !== "reset") && (
+            <input
+              type="text"
+              placeholder="Employee ID"
+              className="w-full px-4 py-2 border rounded-lg"
+              value={empId}
+              onChange={(e) => setEmpId(e.target.value)}
+              required
+            />
+          )}
+
+          {/* Password */}
+          {mode !== "reset" && (
             <input
               type="password"
               placeholder="Password"
@@ -110,6 +123,7 @@ export default function LoginPage() {
             />
           )}
 
+          {/* Role selection (register only) */}
           {mode === "register" && (
             <select
               className="w-full px-4 py-2 border rounded-lg"
@@ -121,28 +135,6 @@ export default function LoginPage() {
               <option value="user">User</option>
               <option value="employee">Employee</option>
             </select>
-          )}
-
-          {mode === "register" && role === "employee" && (
-            <>
-              <input
-                type="text"
-                placeholder="Employee ID"
-                className="w-full px-4 py-2 border rounded-lg"
-                value={empId}
-                onChange={(e) => setEmpId(e.target.value)}
-                required
-              />
-              <input
-                type="password"
-                placeholder="Employee Password"
-                className="w-full px-4 py-2 border rounded-lg"
-                value={empPassword}
-                onChange={(e) => setEmpPassword(e.target.value)}
-                required
-              />
-          
-            </>
           )}
 
           <button
@@ -161,29 +153,23 @@ export default function LoginPage() {
         {mode === "login" && (
           <p className="mt-6 text-center text-sm text-gray-600">
             Don't have an account?{" "}
-            <button onClick={() => setMode("register")} className="text-indigo-600 hover:underline">
-              Register
-            </button>
+            <button onClick={() => setMode("register")} className="text-indigo-600 hover:underline">Register</button>
             <br />
-            <button onClick={() => setMode("reset")} className="text-indigo-600 hover:underline mt-2">
-              Forgot Password?
-            </button>
+            <button onClick={() => setMode("reset")} className="text-indigo-600 hover:underline mt-2">Forgot Password?</button>
           </p>
         )}
+
         {mode === "register" && (
           <p className="mt-6 text-center text-sm text-gray-600">
             Already have an account?{" "}
-            <button onClick={() => setMode("login")} className="text-indigo-600 hover:underline">
-              Login
-            </button>
+            <button onClick={() => setMode("login")} className="text-indigo-600 hover:underline">Login</button>
           </p>
         )}
+
         {mode === "reset" && (
           <p className="mt-6 text-center text-sm text-gray-600">
             Remembered your password?{" "}
-            <button onClick={() => setMode("login")} className="text-indigo-600 hover:underline">
-              Back to Login
-            </button>
+            <button onClick={() => setMode("login")} className="text-indigo-600 hover:underline">Back to Login</button>
           </p>
         )}
       </div>

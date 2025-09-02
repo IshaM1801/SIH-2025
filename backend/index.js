@@ -1,10 +1,9 @@
-// backend/server.js
-const express = require('express');
-const cors = require('cors');
-require('dotenv').config();
-//backend/
-const authRoutes = require('./routes/authRoutes');
-const userRoutes = require('./routes/userRoutes');
+const express = require("express");
+const cors = require("cors");
+require("dotenv").config();
+
+const authRoutes = require("./routes/authRoutes");
+const userRoutes = require("./routes/userRoutes"); // if exists
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -12,9 +11,9 @@ const PORT = process.env.PORT || 5001;
 app.use(cors());
 app.use(express.json());
 
-app.get('/', (req, res) => res.send('server hi'));
+app.get("/", (req, res) => res.send("server hi"));
 
-app.use('/auth', authRoutes);
-app.use('/user', userRoutes);
+app.use("/auth", authRoutes);
+app.use("/user", userRoutes);
 
 app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));

@@ -24,7 +24,7 @@ async function authMiddleware(req, res, next) {
       .from('users')
       .select('id')
       .eq('id', data.user.id)
-      .limit(1);
+      .maybeSingle();
 
     if (fetchErr) {
       console.warn('Warning: error checking users table:', fetchErr);

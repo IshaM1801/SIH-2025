@@ -2,7 +2,7 @@
 const express = require("express");
 const router = express.Router();
 const authController = require("../controllers/authController");
-
+//routes
 // Register (with email verification)
 router.post("/register", authController.register);
 

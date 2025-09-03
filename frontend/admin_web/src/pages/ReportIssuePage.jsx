@@ -51,7 +51,7 @@ function ReportIssuePage() {
         setError("Could not fetch location. Please allow location access.");
       }
     };
-  
+  //.
     fetchLocation();
   }, []);
 

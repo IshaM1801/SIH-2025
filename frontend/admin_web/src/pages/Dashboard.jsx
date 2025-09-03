@@ -247,8 +247,9 @@ const Dashboard = () => {
                   <div className="text-sm text-green-500">+5.1% Since last month</div>
                 </div>
               </div>
+              
 
-              {/* Issue Status Breakdown Donut Chart */}
+              {/* Issue Status Breakdown Donut Chart. */}
               <div className="col-span-6">
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 h-full">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Issue Status Breakdown</h3>

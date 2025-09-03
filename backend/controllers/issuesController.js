@@ -14,7 +14,7 @@ const getAllIssues = async (req, res) => {
         latitude: loc ? loc[1] : null,
         longitude: loc ? loc[0] : null,
       };
-    });
+    });//..
 
     res.json({ issues });
   } catch (err) {

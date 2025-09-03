@@ -1,7 +1,7 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-
+//.
 function IssuesPage() {
   const navigate = useNavigate();
 

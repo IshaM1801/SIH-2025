@@ -40,5 +40,5 @@ app.post("/auth/finalize-verification", async (req, res) => {
 app.use("/auth", authRoutes);
 app.use("/user", userRoutes);
 app.use("/issues", issueRoutes);
-
+//.
 app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));

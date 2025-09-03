@@ -32,48 +32,60 @@ const register = async (req, res) => {
 };
 // ------------------ LOGIN ------------------
 const login = async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, role } = req.body;
 
   if (!email || !password)
     return res.status(400).json({ error: "Please fill all required fields" });
 
   try {
     // 1. Try employee login first
-    const { data: empData, error: empError } = await supabase
-      .from("employee_registry")
-      .select("*")
-      .eq("emp_email", email)
-      .maybeSingle();
+    if(role === "employee") {
+        const { data: empData, error: empError } = await supabase
+        .from("employee_registry")
+        .select("*")
+        .eq("emp_email", email)
+        .maybeSingle();
 
-    if (empError) return res.status(500).json({ error: empError.message });
+      if (empError) return res.status(500).json({ error: empError.message });
 
-    if (empData) {
-      // Found employee
-      if (empData.password !== password)
-        return res.status(401).json({ error: "Invalid password" });
+      if (empData) {
+        // console.log(role, "employee data")
+        // Found employee
+        if (empData.password !== password)
+          return res.status(401).json({ error: "Invalid password" });
 
-      return res.json({
-        message: `✅ Welcome ${empData.name} to the Department of ${empData.dept_name}`,
-        employee: empData,
-        type: "employee",
-      });
+        return res.json({
+          message: `✅ Welcome ${empData.name} to the Department of ${empData.dept_name}`,
+          employee: empData,
+          type: "employee",
+        });
+      } else {
+          return res.status(401).json({ error: "Employee not found." })
+        }
     }
 
     // 2. If not employee, try Supabase Auth (normal user)
-    const { data: authData, error: authError } =
-      await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+    if(role === "user") {
+        const { data: authData, error: authError } =
+        await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
 
-    if (authError) return res.status(401).json({ error: authError.message });
+      if (authError) return res.status(401).json({ error: authError.message });
 
-    return res.json({
-      message: "✅ Welcome!",
-      access_token: authData.session.access_token,
-      user: authData.user,
-      type: "user",
-    });
+      if(authData) {
+        // console.log(role, "user data")
+
+        return res.json({
+        message: "✅ Welcome!",
+        access_token: authData.session.access_token,
+        user: authData.user,
+        type: "user",
+        });
+      }
+    }
+    
   } catch (err) {
     console.error("Login error:", err);
     res.status(500).json({ error: "Server error", details: err.message });

@@ -4,7 +4,7 @@ require("dotenv").config();
 
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes"); // if exists
-
+const issueRoutes = require("./routes/issues")
 const app = express();
 const PORT = process.env.PORT || 5001;
 
@@ -39,5 +39,6 @@ app.post("/auth/finalize-verification", async (req, res) => {
   });
 app.use("/auth", authRoutes);
 app.use("/user", userRoutes);
+app.use("/issues", issueRoutes);
 
 app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));

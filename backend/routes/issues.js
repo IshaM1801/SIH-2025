@@ -11,6 +11,6 @@ const {//.
 // Routes
 router.get('/', authMiddleware, getAllIssues);
 router.get('/user/:userId', authMiddleware, getUserIssues);
-router.post('/', authMiddleware, createIssue);
+router.post('/create', authMiddleware, createIssue);
 
 module.exports = router;

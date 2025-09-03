@@ -67,28 +67,52 @@ function ReportIssuePage() {
     setLoading(true);
     setError("");
     setSuccess("");
-
+  
     if (!formData.issue_title || !formData.issue_description || !formData.department || !formData.latitude || !formData.longitude) {
       setError("⚠️ All fields and location are required");
       setLoading(false);
       return;
     }
-
+  
     try {
-      const res = await fetch("http://localhost:5001/issues", {
+      // 1️⃣ Get Supabase access token from stored session
+      const authData = JSON.parse(localStorage.getItem("user") || "{}");
+      const token = authData?.session?.access_token;
+  
+      if (!token) {
+        setError("User is not logged in or token not found");
+        setLoading(false);
+        return;
+      }
+  
+      // 2️⃣ Log the payload to see the pattern
+      console.log("Submitting payload:", { ...formData, created_by: authData.user.id });
+  
+      // 3️⃣ Send request with token
+      const res = await fetch("http://localhost:5001/issues/create", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`, // <-- send token here
+        },
         body: JSON.stringify({
           ...formData,
-          created_by: userId,
+          created_by: authData.user.id, // use user id from token
         }),
       });
-
+  
       const data = await res.json();
+      console.log("Response from backend:", data);
+  
       if (!res.ok) throw new Error(data.error || "Issue submission failed");
-
-      setSuccess(data.message || "Issue reported successfully!");
-      setFormData(prev => ({ ...prev, issue_title: "", issue_description: "", department: "" }));
+  
+      setSuccess("✅ Issue reported successfully!");
+      setFormData(prev => ({
+        ...prev,
+        issue_title: "",
+        issue_description: "",
+        department: "",
+      }));
     } catch (err) {
       setError(err.message);
     } finally {

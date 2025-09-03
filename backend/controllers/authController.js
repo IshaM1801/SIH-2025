@@ -70,6 +70,7 @@ const login = async (req, res) => {
 
     return res.json({
       message: "✅ Welcome!",
+      access_token: authData.session.access_token,
       user: authData.user,
       type: "user",
     });

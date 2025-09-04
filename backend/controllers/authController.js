@@ -1,8 +1,10 @@
 require("dotenv").config();
+const jwt = require("jsonwebtoken");
 const { createClient } = require("@supabase/supabase-js");
 
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_ANON_KEY; // for auth
+const supabaseKey = process.env.SUPABASE_ANON_KEY; // fo
+// r auth
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // ------------------ USER REGISTRATION ------------------
@@ -38,9 +40,9 @@ const login = async (req, res) => {
     return res.status(400).json({ error: "Please fill all required fields" });
 
   try {
-    // 1. Try employee login first
-    if(role === "employee") {
-        const { data: empData, error: empError } = await supabase
+    // 1️⃣ Employee login
+    if (role === "employee") {
+      const { data: empData, error: empError } = await supabase
         .from("employee_registry")
         .select("*")
         .eq("emp_email", email)
@@ -48,49 +50,53 @@ const login = async (req, res) => {
 
       if (empError) return res.status(500).json({ error: empError.message });
 
-      if (empData) {
-        // console.log(role, "employee data")
-        // Found employee
-        if (empData.password !== password)
-          return res.status(401).json({ error: "Invalid password" });
+      if (!empData) return res.status(401).json({ error: "Employee not found." });
 
-        return res.json({
-          message: `✅ Welcome ${empData.name} to the Department of ${empData.dept_name}`,
-          employee: empData,
-          type: "employee",
-        });
-      } else {
-          return res.status(401).json({ error: "Employee not found." })
-        }
+      if (empData.password !== password)
+        return res.status(401).json({ error: "Invalid password" });
+
+      // 🔑 Create custom JWT for employee
+      const empToken = jwt.sign(
+        { email: empData.emp_email, role: "employee" },
+        process.env.EMPLOYEE_JWT_SECRET,
+        { expiresIn: "8h" }
+      );
+
+      return res.json({
+        message: `✅ Welcome ${empData.name} to the Department of ${empData.dept_name}`,
+        access_token: empToken,     // employee token
+        employee: empData,
+        type: "employee",
+      });
     }
 
-    // 2. If not employee, try Supabase Auth (normal user)
-    if(role === "user") {
-        const { data: authData, error: authError } =
-        await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
+    // 2️⃣ User login via Supabase
+    if (role === "user") {
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
       if (authError) return res.status(401).json({ error: authError.message });
+      if (!authData) return res.status(401).json({ error: "User not found" });
 
-      if(authData) {
-        // console.log(role, "user data")
-
-        return res.json({
+      return res.json({
         message: "✅ Welcome!",
-        access_token: authData.session.access_token,
+        access_token: authData.session.access_token, // Supabase token
         user: authData.user,
         type: "user",
-        });
-      }
+      });
     }
-    
+
+    return res.status(400).json({ error: "Invalid role" });
+
   } catch (err) {
     console.error("Login error:", err);
     res.status(500).json({ error: "Server error", details: err.message });
   }
 };
+
+module.exports = { login };
 
 // ------------------ VERIFY TOKEN ------------------
 

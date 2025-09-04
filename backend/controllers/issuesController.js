@@ -91,34 +91,38 @@ const createIssue = async (req, res) => {
 //  Fetch issues only of the logged-in user's department
 const getDeptIssues = async (req, res) => {
   try {
-    // Get user email from authMiddleware
-    const userEmail = req.user.email;
+    // ✅ Check what the JWT decoded to
+    console.log("Decoded JWT:", req.user);
 
-    // Step 1: Find user department from employee_registry
+    // Get employee email from decoded JWT
+    const employeeEmail = req.user.email;
+
+    // Step 1: Find department of employee
     const { data: employee, error: empError } = await supabase
-      .from('employee_registry')
-      .select('dept_name')
-      .eq('emp_email', userEmail)
+      .from("employee_registry")
+      .select("dept_name")
+      .eq("emp_email", employeeEmail)
       .single();
 
     if (empError || !employee) {
-      return res.status(403).json({ error: 'Department not found for user' });
+      return res.status(403).json({ error: "Department not found for employee" });
     }
 
-    // Step 2: Fetch issues of that department
+    // Step 2: Fetch issues for that department
     const { data: issues, error: issueError } = await supabase
-      .from('issues')
-      .select('*')
-      .eq('department', employee.dept_name);
+      .from("issues")
+      .select("*")
+      .eq("department", employee.dept_name);
 
     if (issueError) throw issueError;
 
     res.json({ issues });
   } catch (err) {
-    console.error('getDeptIssues err', err);
+    console.error("getDeptIssues error:", err);
     res.status(500).json({ error: err.message });
   }
 };
+
 
 
 module.exports = {

@@ -39,45 +39,44 @@ function Login() {
   // Unified login handler for user or employee
   const handleLogin = async (e) => {
     e.preventDefault();
-  
+
     if (!formData.email || !formData.password) {
       setError("All fields are required");
       return;
     }
-  
+
     setLoading(true);
     setError("");
     setSuccessMessage("");
-  
+
     try {
       const payload = {
         email: formData.email,
         password: formData.password,
         role: mode === "employee" ? "employee" : "user",
       };
-  
+
       const response = await fetch("http://localhost:5001/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-  
+
       const data = await response.json();
-      // console.log("Backend response:", data);
-  
+
       if (!response.ok) throw new Error(data.error || "Login failed");
-  
+
       setSuccessMessage(data.message || "Login successful!");
-  
-      // ✅ Save based on backend response type
+
+      // Save token & user info
       if (data.type === "employee" && mode === "employee") {
-        localStorage.setItem("adminUser", JSON.stringify(data));
+        // ✅ generate custom JWT in backend
+        localStorage.setItem("employee_token", data.access_token); 
+        localStorage.setItem("adminUser", JSON.stringify(data.employee));
         setTimeout(() => navigate("/dashboard"), 1000);
       } else if (data.type === "user" && mode === "user") {
-        // 🔑 Store Supabase user & token separately
-        localStorage.setItem("token", data.access_token); // token for API requests
-        localStorage.setItem("user", JSON.stringify(data.user)); // user profile
-  
+        localStorage.setItem("token", data.access_token); // Supabase token
+        localStorage.setItem("user", JSON.stringify(data.user));
         setTimeout(() => navigate("/report-issue"), 1000);
       } else {
         setError("Unknown user type from backend. Please contact support.");

@@ -1,4 +1,4 @@
-// backend/controllers/userController.js
+
 const supabase = require('../config/supabaseClient');
 
 /**
@@ -52,20 +52,61 @@ async function createReport(req, res) {
 /**
  * List reports for logged-in user
  */
+
+
+const fs = require('fs');
+const path = require('path');
+
+// EWKB parser
+function wkbToLatLng(wkbHex) {
+  const bytes = new Uint8Array(wkbHex.match(/.{2}/g).map(b => parseInt(b, 16)));
+  const view = new DataView(bytes.buffer);
+
+  const littleEndian = view.getUint8(0) === 1;
+  let geometryType = view.getUint32(1, littleEndian);
+  const typeCode = geometryType & 0xFF;
+
+  if (typeCode !== 1) throw new Error('This function only supports POINT geometry');
+
+  const hasSrid = (geometryType & 0x20000000) !== 0;
+  let offset = 5;
+  let srid = null;
+  if (hasSrid) {
+    srid = view.getUint32(5, littleEndian);
+    offset += 4;
+  }
+
+  const longitude = view.getFloat64(offset, littleEndian);
+  const latitude = view.getFloat64(offset + 8, littleEndian);
+
+  return { latitude, longitude, srid };
+}
+
+// EWKB POINT parser
+
+
+// listReports template function
+// Accepts any array of items with `location` field in WKB hex
 async function listReports(req, res) {
   try {
-    const { data, error } = await supabase
-      .from('reports')
-      .select('*')
-      .eq('reporter_id', req.user.id)
-      .order('created_at', { ascending: false });
+    const userId = req.user.id; // Assuming auth middleware sets req.user
 
-    if (error) return res.status(500).json({ error: error.message || error });
-    res.json({ reports: data || [] });
+    // Fetch issues from Supabase where created_by == current user
+    const { data: issues, error } = await supabase
+      .from('issues')
+      .select('*')
+      .eq('created_by', userId);
+
+    if (error) throw error;
+
+    // Return issues directly
+    res.json(issues || []);
   } catch (err) {
-    console.error('listReports err', err);
-    res.status(500).json({ error: 'Server error listing reports' });
+    console.error('Error fetching issues:', err);
+    res.status(500).json({ error: err.message });
   }
 }
-//backend/
+
+
+
 module.exports = { getProfile, createReport, listReports };

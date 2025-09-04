@@ -7,7 +7,7 @@ const { getProfile, createReport, listReports } = require('../controllers/userCo
 // protected
 router.get('/profile', auth, getProfile);
 router.post('/reports', auth, createReport);   // Create simple report (JSON)
-router.get('/reports', auth, listReports);     // List reports for logged-in user
+router.get('/my-reports', auth, listReports);     // List reports for logged-in user
 
 module.exports = router;
 //backend/

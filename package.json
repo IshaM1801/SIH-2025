@@ -1,6 +1,10 @@
 {
   "dependencies": {
     "@radix-ui/react-select": "^2.2.6",
-    "jsonwebtoken": "^9.0.2"
+    "jsonwebtoken": "^9.0.2",
+    "wkx": "^0.5.0"
+  },
+  "devDependencies": {
+    "@types/geojson": "^7946.0.16"
   }
 }

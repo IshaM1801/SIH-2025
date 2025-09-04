@@ -58,14 +58,24 @@ const createIssue = async (req, res) => {
   }
 
   try {
-    const user = req.user; // ✅ comes from authMiddleware
+    const user = req.user; 
     const created_by = user.id;
 
-    // 1️⃣ Get client IP (from headers or fallback to remote address)
-    const clientIp =
+    // Get client IP
+    let clientIp =
       req.headers["x-forwarded-for"]?.split(",")[0] || req.socket.remoteAddress;
 
-    // 2️⃣ Call IP Geolocation API
+    // If localhost, fallback to public IP
+    if (clientIp === "::1" || clientIp === "127.0.0.1") {
+      // Option 1: Use a fixed public IP for testing
+      clientIp = "8.8.8.8";
+
+      // Option 2: Fetch your real public IP dynamically (uncomment below)
+      // const ipRes = await axios.get("https://api.ipify.org?format=json");
+      // clientIp = ipRes.data.ip;
+    }
+
+    // Call IP Geolocation API
     const apiKey = process.env.IPGEO_API_KEY; 
     const geoUrl = `https://api.ipgeolocation.io/v2/ipgeo?apiKey=${apiKey}&ip=${clientIp}&fields=location`;
 
@@ -75,7 +85,7 @@ const createIssue = async (req, res) => {
     const latitude = locationData.latitude;
     const longitude = locationData.longitude;
 
-    // 3️⃣ Insert issue into Supabase
+    // Insert issue into Supabase
     const { data, error } = await supabase
       .from("issues")
       .insert([
@@ -87,7 +97,7 @@ const createIssue = async (req, res) => {
           location:
             latitude && longitude
               ? `SRID=4326;POINT(${longitude} ${latitude})`
-              : null, // ✅ PostGIS format
+              : null,
         },
       ])
       .select()

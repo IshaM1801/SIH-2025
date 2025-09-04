@@ -1,4 +1,5 @@
 const supabase = require('../supabase');
+const axios = require("axios"); // ✅ for API call
 
 // 1️⃣ Fetch all issues
 const getAllIssues = async (req, res) => {
@@ -50,16 +51,31 @@ const getUserIssues = async (req, res) => {
 
 // 3️⃣ Create a new issue
 const createIssue = async (req, res) => {
-  const { issue_title, issue_description, latitude, longitude, department } = req.body;
+  const { issue_title, issue_description, department } = req.body;
 
   if (!issue_title || !issue_description) {
     return res.status(400).json({ error: "Missing required fields" });
   }
 
   try {
-    const user = req.user; // ✅ comes from middleware
+    const user = req.user; // ✅ comes from authMiddleware
     const created_by = user.id;
 
+    // 1️⃣ Get client IP (from headers or fallback to remote address)
+    const clientIp =
+      req.headers["x-forwarded-for"]?.split(",")[0] || req.socket.remoteAddress;
+
+    // 2️⃣ Call IP Geolocation API
+    const apiKey = process.env.IPGEO_API_KEY; 
+    const geoUrl = `https://api.ipgeolocation.io/v2/ipgeo?apiKey=${apiKey}&ip=${clientIp}&fields=location`;
+
+    const geoResponse = await axios.get(geoUrl);
+    const locationData = geoResponse.data.location;
+
+    const latitude = locationData.latitude;
+    const longitude = locationData.longitude;
+
+    // 3️⃣ Insert issue into Supabase
     const { data, error } = await supabase
       .from("issues")
       .insert([
@@ -71,7 +87,7 @@ const createIssue = async (req, res) => {
           location:
             latitude && longitude
               ? `SRID=4326;POINT(${longitude} ${latitude})`
-              : null,
+              : null, // ✅ PostGIS format
         },
       ])
       .select()
@@ -83,6 +99,7 @@ const createIssue = async (req, res) => {
       .status(201)
       .json({ message: "Issue created successfully", issue: data });
   } catch (err) {
+    console.error("createIssue error:", err);
     res.status(500).json({ error: err.message });
   }
 };

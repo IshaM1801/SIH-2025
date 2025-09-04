@@ -68,36 +68,41 @@ function ReportIssuePage() {
     setError("");
     setSuccess("");
   
-    if (!formData.issue_title || !formData.issue_description || !formData.department || !formData.latitude || !formData.longitude) {
+    if (
+      !formData.issue_title ||
+      !formData.issue_description ||
+      !formData.department ||
+      !formData.latitude ||
+      !formData.longitude
+    ) {
       setError("⚠️ All fields and location are required");
       setLoading(false);
       return;
     }
   
     try {
-      // 1️⃣ Get Supabase access token from stored session
-      const authData = JSON.parse(localStorage.getItem("user") || "{}");
-      const token = authData?.session?.access_token;
+      // ✅ Get token and user
+      const token = localStorage.getItem("token");
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
   
-      if (!token) {
+      if (!token || !user?.id) {
         setError("User is not logged in or token not found");
         setLoading(false);
         return;
       }
   
-      // 2️⃣ Log the payload to see the pattern
-      console.log("Submitting payload:", { ...formData, created_by: authData.user.id });
+      console.log("Submitting payload:", { ...formData, created_by: user.id });
   
-      // 3️⃣ Send request with token
+      // ✅ Send request with token
       const res = await fetch("http://localhost:5001/issues/create", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`, // <-- send token here
+          "Authorization": `Bearer ${token}`,
         },
         body: JSON.stringify({
           ...formData,
-          created_by: authData.user.id, // use user id from token
+          created_by: user.id,
         }),
       });
   
@@ -107,7 +112,7 @@ function ReportIssuePage() {
       if (!res.ok) throw new Error(data.error || "Issue submission failed");
   
       setSuccess("✅ Issue reported successfully!");
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
         issue_title: "",
         issue_description: "",

@@ -1,48 +1,20 @@
-// backend/middleware/authMiddleware.js
-const supabase = require('../config/supabaseClient');
-//backend/
-async function authMiddleware(req, res, next) {
-  try {
-    const authHeader = req.headers.authorization || '';
-    const token = authHeader.replace('Bearer ', '');
+// middleware/authMiddleware.js
+const { supabase } = require("../controllers/authController"); // ✅ FIXED
 
-    if (!token) {
-      return res.status(401).json({ error: 'No token provided' });
-    }
+const authenticateUser = async (req, res, next) => {
+  const authHeader = req.headers["authorization"];
+  if (!authHeader) return res.status(401).json({ error: "No token provided" });
 
-    const { data, error } = await supabase.auth.getUser(token);
+  const token = authHeader.split(" ")[1]; // after "Bearer"
 
-    if (error || !data?.user) {
-      return res.status(401).json({ error: 'Invalid or expired token' });
-    }
+  const { data, error } = await supabase.auth.getUser(token);
 
-    req.user = data.user; // supabase user object
-
-    // Optional: ensure a row exists in your 'users' table for quick joins/metadata
-    // check and insert if missing (non-blocking if you prefer)
-    const { data: existing, error: fetchErr } = await supabase
-      .from('users')
-      .select('id')
-      .eq('id', data.user.id)
-      .maybeSingle();
-
-    if (fetchErr) {
-      console.warn('Warning: error checking users table:', fetchErr);
-    } else if (!existing || existing.length === 0) {
-      // create minimal user record
-      await supabase.from('users').insert([{
-        id: data.user.id,
-        email: data.user.email,
-        name: data.user.user_metadata?.full_name || null,
-        created_at: new Date().toISOString()
-      }]);
-    }
-
-    next();
-  } catch (err) {
-    console.error('Auth middleware error:', err);
-    res.status(500).json({ error: 'Auth verification failed' });
+  if (error || !data.user) {
+    return res.status(401).json({ error: "Invalid or expired token" });
   }
-}
 
-module.exports = authMiddleware;
+  req.user = data.user; // ✅ attach user
+  next();
+};
+
+module.exports = authenticateUser;

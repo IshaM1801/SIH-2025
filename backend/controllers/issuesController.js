@@ -50,30 +50,38 @@ const getUserIssues = async (req, res) => {
 
 // 3️⃣ Create a new issue
 const createIssue = async (req, res) => {
-  const { issue_title, issue_description, created_by, latitude, longitude, department } = req.body;
+  const { issue_title, issue_description, latitude, longitude, department } = req.body;
 
-  // Validate required fields
-  if (!issue_title || !issue_description || !created_by) {
+  if (!issue_title || !issue_description) {
     return res.status(400).json({ error: "Missing required fields" });
   }
 
   try {
+    const user = req.user; // ✅ comes from middleware
+    const created_by = user.id;
+
     const { data, error } = await supabase
-      .from('issues')
+      .from("issues")
       .insert([
         {
           issue_title,
           issue_description,
           created_by,
           department: department || null,
-          location: latitude && longitude ? `SRID=4326;POINT(${longitude} ${latitude})` : null
-        }
+          location:
+            latitude && longitude
+              ? `SRID=4326;POINT(${longitude} ${latitude})`
+              : null,
+        },
       ])
-      .select(); // ✅ Important: returns inserted row(s)
+      .select()
+      .single();
 
-    if (error) throw error; // If insert fails, stop here
+    if (error) throw error;
 
-    res.status(201).json({ message: "Issue created successfully", issue: data[0] });
+    res
+      .status(201)
+      .json({ message: "Issue created successfully", issue: data });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -38,54 +38,56 @@ function Login() {
 
   // Unified login handler for user or employee
   const handleLogin = async (e) => {
-  e.preventDefault();
-
-  if (!formData.email || !formData.password) {
-    setError("All fields are required");
-    return;
-  }
-
-  setLoading(true);
-  setError("");
-  setSuccessMessage("");
-
-  try {
-    const payload = { 
-      email: formData.email, 
-      password: formData.password,
-      role: mode === "employee" ? "employee" : "user"
-    };
-
-    const response = await fetch("http://localhost:5001/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    const data = await response.json();
-    // console.log("Backend response:", data);
-
-    if (!response.ok) throw new Error(data.error || "Login failed");
-
-    setSuccessMessage(data.message || "Login successful!");
-
-    // Use the backend response type, NOT the frontend mode
-    if (data.type === "employee" && mode === "employee") {
-      localStorage.setItem("adminUser", JSON.stringify(data));
-      setTimeout(() => navigate("/dashboard"), 1000);
-    } else if (data.type === "user" && mode === "user") {
-      localStorage.setItem("user", JSON.stringify(data));
-      setTimeout(() => navigate("/report-issue"), 1000);
-    } else {
-      setError("Unknown user type from backend. Please contact support.");
+    e.preventDefault();
+  
+    if (!formData.email || !formData.password) {
+      setError("All fields are required");
+      return;
     }
-
-  } catch (err) {
-    setError(err.message);
-  } finally {
-    setLoading(false);
-  }
-};
+  
+    setLoading(true);
+    setError("");
+    setSuccessMessage("");
+  
+    try {
+      const payload = {
+        email: formData.email,
+        password: formData.password,
+        role: mode === "employee" ? "employee" : "user",
+      };
+  
+      const response = await fetch("http://localhost:5001/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+  
+      const data = await response.json();
+      // console.log("Backend response:", data);
+  
+      if (!response.ok) throw new Error(data.error || "Login failed");
+  
+      setSuccessMessage(data.message || "Login successful!");
+  
+      // ✅ Save based on backend response type
+      if (data.type === "employee" && mode === "employee") {
+        localStorage.setItem("adminUser", JSON.stringify(data));
+        setTimeout(() => navigate("/dashboard"), 1000);
+      } else if (data.type === "user" && mode === "user") {
+        // 🔑 Store Supabase user & token separately
+        localStorage.setItem("token", data.access_token); // token for API requests
+        localStorage.setItem("user", JSON.stringify(data.user)); // user profile
+  
+        setTimeout(() => navigate("/report-issue"), 1000);
+      } else {
+        setError("Unknown user type from backend. Please contact support.");
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen w-full flex justify-center items-center bg-[#FAF6F0] px-4">

@@ -13,6 +13,8 @@ const PORT = process.env.PORT || 5001;
 app.use(cors());
 app.use(express.json());
 
+app.set("trust proxy", true);   //to fetch real IP of user
+
 // Test route
 app.get("/", (req, res) => res.send("server hi"));
 

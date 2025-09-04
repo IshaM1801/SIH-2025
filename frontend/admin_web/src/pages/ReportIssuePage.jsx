@@ -23,18 +23,15 @@ function ReportIssuePage() {
         setError("Geolocation is not supported by your browser");
         return;
       }
-
+  
       try {
-        const permissionStatus = await navigator.permissions.query({
-          name: "geolocation",
-        });
+        // Request permission first
+        const permissionStatus = await navigator.permissions.query({ name: "geolocation" });
         if (permissionStatus.state === "denied") {
-          setError(
-            "Location access is denied. Please enable it in browser settings."
-          );
+          setError("Location access is denied. Please enable it in browser settings.");
           return;
         }
-
+  
         navigator.geolocation.getCurrentPosition(
           (position) => {
             setFormData((prev) => ({
@@ -54,13 +51,13 @@ function ReportIssuePage() {
         setError("Could not fetch location. Please allow location access.");
       }
     };
-
+  //.
     fetchLocation();
   }, []);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData(prev => ({ ...prev, [name]: value }));
     setError("");
     setSuccess("");
   };
@@ -70,7 +67,7 @@ function ReportIssuePage() {
     setLoading(true);
     setError("");
     setSuccess("");
-
+  
     if (
       !formData.issue_title ||
       !formData.issue_description ||
@@ -82,44 +79,38 @@ function ReportIssuePage() {
       setLoading(false);
       return;
     }
-
+  
     try {
+      // ✅ Get token and user
       const token = localStorage.getItem("token");
       const user = JSON.parse(localStorage.getItem("user") || "{}");
-
+  
       if (!token || !user?.id) {
         setError("User is not logged in or token not found");
         setLoading(false);
         return;
       }
-
+  
       console.log("Submitting payload:", { ...formData, created_by: user.id });
-
+  
+      // ✅ Send request with token
       const res = await fetch("http://localhost:5001/issues/create", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          "Authorization": `Bearer ${token}`,
         },
         body: JSON.stringify({
           ...formData,
           created_by: user.id,
         }),
       });
-
+  
       const data = await res.json();
       console.log("Response from backend:", data);
-
-      if (!res.ok) {
-        if (res.status === 409) {
-          // 🔴 Duplicate issue detected
-          throw new Error(
-            "⚠️ This issue has already been reported at this location."
-          );
-        }
-        throw new Error(data.error || "Issue submission failed");
-      }
-
+  
+      if (!res.ok) throw new Error(data.error || "Issue submission failed");
+  
       setSuccess("✅ Issue reported successfully!");
       setFormData((prev) => ({
         ...prev,
@@ -141,10 +132,7 @@ function ReportIssuePage() {
       {error && <p className="text-red-600 mb-4">{error}</p>}
       {success && <p className="text-green-600 mb-4">{success}</p>}
 
-      <form
-        onSubmit={handleSubmit}
-        className="flex flex-col gap-4 w-full max-w-md bg-white p-6 rounded shadow"
-      >
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4 w-full max-w-md bg-white p-6 rounded shadow">
         <Input
           name="issue_title"
           placeholder="Issue Title"
@@ -169,8 +157,7 @@ function ReportIssuePage() {
         />
 
         <p className="text-gray-600 text-sm">
-          Latitude: {formData.latitude || "Fetching..."} | Longitude:{" "}
-          {formData.longitude || "Fetching..."}
+          Latitude: {formData.latitude || "Fetching..."} | Longitude: {formData.longitude || "Fetching..."}
         </p>
 
         <Button type="submit" disabled={loading}>

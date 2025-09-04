@@ -72,7 +72,7 @@ function Login() {
         setTimeout(() => navigate("/issues"), 1000);
       } else {
         setError("Unknown user type from backend. Please contact support.");
-      }
+      }//.
     } catch (err) {
       setError(err.message);
     } finally {

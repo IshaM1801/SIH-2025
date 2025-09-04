@@ -22,7 +22,7 @@ const authMiddleware = async (req, res, next) => {
     } catch (_) {
       // Not an employee token, try Supabase token
     }
-
+//.
     // 2️⃣ Verify Supabase user token
     const { data: { user }, error } = await supabase.auth.getUser(token);
 

@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/authMiddleware');
 const { getProfile, createReport, listReports } = require('../controllers/userController');
-
+//.
 // protected
 router.get('/profile', auth, getProfile);
 router.post('/reports', auth, createReport);   // Create simple report (JSON)

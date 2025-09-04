@@ -87,8 +87,43 @@ const createIssue = async (req, res) => {
   }
 };
 
+
+//  Fetch issues only of the logged-in user's department
+const getDeptIssues = async (req, res) => {
+  try {
+    // Get user email from authMiddleware
+    const userEmail = req.user.email;
+
+    // Step 1: Find user department from employee_registry
+    const { data: employee, error: empError } = await supabase
+      .from('employee_registry')
+      .select('dept_name')
+      .eq('emp_email', userEmail)
+      .single();
+
+    if (empError || !employee) {
+      return res.status(403).json({ error: 'Department not found for user' });
+    }
+
+    // Step 2: Fetch issues of that department
+    const { data: issues, error: issueError } = await supabase
+      .from('issues')
+      .select('*')
+      .eq('department', employee.dept_name);
+
+    if (issueError) throw issueError;
+
+    res.json({ issues });
+  } catch (err) {
+    console.error('getDeptIssues err', err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+
 module.exports = {
   getAllIssues,
   getUserIssues,
-  createIssue
-};//.
+  createIssue,
+  getDeptIssues 
+};

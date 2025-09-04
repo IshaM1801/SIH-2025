@@ -32,9 +32,9 @@ function App() {
         } />
         
         <Route path="/issues" element={
-          <AdminProtectedRoute>
+          <UserProtectedRoute>
             <IssuesPage/>
-          </AdminProtectedRoute>
+          </UserProtectedRoute>
         } />
         
         <Route path="/report-issue" element={
@@ -44,7 +44,7 @@ function App() {
         } />
         
         {/* Default redirects */}
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/" element={<Navigate to="/issues" replace />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </>

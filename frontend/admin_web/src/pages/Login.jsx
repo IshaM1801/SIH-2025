@@ -10,16 +10,6 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 
 function Login() {
   const navigate = useNavigate();
@@ -75,9 +65,11 @@ function Login() {
         localStorage.setItem("adminUser", JSON.stringify(data.employee));
         setTimeout(() => navigate("/dashboard"), 1000);
       } else if (data.type === "user" && mode === "user") {
-        localStorage.setItem("token", data.access_token); // Supabase token
-        localStorage.setItem("user", JSON.stringify(data.user));
-        setTimeout(() => navigate("/report-issue"), 1000);
+        // 🔑 Store Supabase user & token separately
+        localStorage.setItem("token", data.access_token); // token for API requests
+        localStorage.setItem("user", JSON.stringify(data.user)); // user profile
+  
+        setTimeout(() => navigate("/issues"), 1000);
       } else {
         setError("Unknown user type from backend. Please contact support.");
       }

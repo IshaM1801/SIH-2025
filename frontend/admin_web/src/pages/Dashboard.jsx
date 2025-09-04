@@ -6,6 +6,7 @@ import {
   Search, Bell, Users, Shield, DollarSign, RefreshCw, HelpCircle, FileText,
   MapPin, Settings, MessageSquare, BookOpen, Award, Eye
 } from 'lucide-react';
+import DepartmentIssuesComponent from '@/components/ui/DepartmentIssues';
 
 const Dashboard = () => {
   // Data for civic issue reporting system
@@ -201,6 +202,10 @@ const Dashboard = () => {
                   <div className="text-xs text-green-500 truncate">+5.1% Since last month</div>
                 </div>
               </div>
+            </div>
+
+            <div className="mb-8">
+              <DepartmentIssuesComponent />
             </div>
 
             {/* Charts Grid */}

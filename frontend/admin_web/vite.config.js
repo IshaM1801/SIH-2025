@@ -9,6 +9,11 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  server: {
+    host: true,
+    port: 5173,
+    allowedHosts: ['.ngrok-free.app'] // allow any ngrok subdomain
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

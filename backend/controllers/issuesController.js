@@ -1,4 +1,4 @@
-const supabase = require('../supabase');//.
+const supabase = require('../supabase');
 const axios = require("axios"); // ✅ for API call
 
 // 1️⃣ Fetch all issues

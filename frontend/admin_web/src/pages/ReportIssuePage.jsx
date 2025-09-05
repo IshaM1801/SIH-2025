@@ -153,7 +153,7 @@ function ReportIssuePage() {
     setLoading(true);
     setError("");
     setSuccess("");
-
+  
     if (
       !formData.issue_title ||
       !formData.issue_description ||
@@ -165,35 +165,42 @@ function ReportIssuePage() {
       setLoading(false);
       return;
     }
-
+  
     try {
       const token = localStorage.getItem("token");
       const user = JSON.parse(localStorage.getItem("user") || "{}");
-
+  
       if (!token || !user?.id) {
         setError("User is not logged in or token not found");
         setLoading(false);
         return;
       }
-
-      // For now, we'll submit without image upload
-      // In production, you'd upload the image to a cloud service first
+  
+      // Create FormData for sending both text fields and image
+      const payload = new FormData();
+      payload.append("issue_title", formData.issue_title);
+      payload.append("issue_description", formData.issue_description);
+      payload.append("department", formData.department);
+      payload.append("latitude", formData.latitude);
+      payload.append("longitude", formData.longitude);
+      payload.append("created_by", user.id);
+  
+      if (selectedImage) {
+        payload.append("photo", selectedImage); // attach file
+      }
+  
       const response = await fetch("http://localhost:5001/issues/create", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
+          Authorization: `Bearer ${token}`, // DO NOT set Content-Type for FormData
         },
-        body: JSON.stringify({
-          ...formData,
-          created_by: user.id,
-        }),
+        body: payload,
       });
-
+  
       const data = await response.json();
-
+  
       if (!response.ok) throw new Error(data.error || "Issue submission failed");
-
+  
       setSuccess("Issue reported successfully!");
       setFormData((prev) => ({
         ...prev,

@@ -49,7 +49,6 @@ const getUserIssues = async (req, res) => {
   }
 };
 
-// 3️⃣ Create a new issue
 const createIssue = async (req, res) => {
   const { issue_title, issue_description, department } = req.body;
 
@@ -58,13 +57,13 @@ const createIssue = async (req, res) => {
   }
 
   try {
-    const user = req.user; 
+    const user = req.user; // Comes from authMiddleware
     const created_by = user.id;
 
-    // Handle uploaded file (multer puts file in req.file)
+    // Handle uploaded file (optional, if using multer)
     let imageUrl = null;
     if (req.file) {
-      const file = req.file; // multer memoryStorage object
+      const file = req.file;
       const fileExt = file.originalname.split(".").pop();
       const fileName = `issues/${Date.now()}.${fileExt}`;
 
@@ -89,19 +88,27 @@ const createIssue = async (req, res) => {
     let clientIp =
       req.headers["x-forwarded-for"]?.split(",")[0] || req.socket.remoteAddress;
 
+    // Fallback if localhost
     if (clientIp === "::1" || clientIp === "127.0.0.1") {
-      clientIp = "8.8.8.8"; // fallback for localhost
+      clientIp = "8.8.8.8"; // Example fallback IP
     }
 
-    // Call IP Geolocation API
-    const apiKey = process.env.IPGEO_API_KEY; 
-    const geoUrl = `https://api.ipgeolocation.io/v2/ipgeo?apiKey=${apiKey}&ip=${clientIp}&fields=location`;
+    // Call Ambee Geolocation API
+    const ambeeApiKey = "17a5ef9024968d4934217a74dc987394313f247569767fd3570ab8349162f96e";
+    const geoUrl = `https://api.ambeedata.com/geo/ip/${clientIp}`;
 
-    const geoResponse = await axios.get(geoUrl);
-    const locationData = geoResponse.data.location;
+    let latitude = null;
+    let longitude = null;
 
-    const latitude = locationData.latitude;
-    const longitude = locationData.longitude;
+    try {
+      const geoResponse = await axios.get(geoUrl, {
+        headers: { "x-api-key": ambeeApiKey },
+      });
+      latitude = geoResponse.data?.data?.latitude || null;
+      longitude = geoResponse.data?.data?.longitude || null;
+    } catch (geoErr) {
+      console.warn("Ambee geolocation API failed:", geoErr.message);
+    }
 
     // Insert issue into Supabase
     const { data, error } = await supabase
@@ -112,7 +119,7 @@ const createIssue = async (req, res) => {
           issue_description,
           created_by,
           department: department || null,
-          image_url: imageUrl, // store the uploaded image URL
+          image_url: imageUrl,
           location:
             latitude && longitude
               ? `SRID=4326;POINT(${longitude} ${latitude})`
@@ -124,9 +131,7 @@ const createIssue = async (req, res) => {
 
     if (error) throw error;
 
-    res
-      .status(201)
-      .json({ message: "Issue created successfully", issue: data });
+    res.status(201).json({ message: "Issue created successfully", issue: data });
   } catch (err) {
     console.error("createIssue error:", err);
     res.status(500).json({ error: err.message });

@@ -52,13 +52,13 @@ function ReportIssuePage() {
   useEffect(() => {
     const fetchLocation = async () => {
       setLocationLoading(true);
-      
+  
       if (!navigator.geolocation) {
         setError("Geolocation is not supported by your browser");
         setLocationLoading(false);
         return;
       }
-
+  
       try {
         const permissionStatus = await navigator.permissions.query({ name: "geolocation" });
         if (permissionStatus.state === "denied") {
@@ -66,7 +66,7 @@ function ReportIssuePage() {
           setLocationLoading(false);
           return;
         }
-
+  
         navigator.geolocation.getCurrentPosition(
           (position) => {
             setFormData((prev) => ({
@@ -89,7 +89,7 @@ function ReportIssuePage() {
         setLocationLoading(false);
       }
     };
-
+  
     fetchLocation();
   }, []);
 

@@ -32,10 +32,60 @@ function ReportIssuePage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [locationLoading, setLocationLoading] = useState(true);
+  const [address, setAddress] = useState("");
+  const [addressLoading, setAddressLoading] = useState(false);
 
   const user = JSON.parse(localStorage.getItem("user") || "{}");
 
   // Department options
+
+  // Reverse geocoding function
+  const reverseGeocode = async (lat, lng) => {
+    setAddressLoading(true);
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
+        {
+          headers: {
+            'User-Agent': 'FixMyCity-App'
+          }
+        }
+      );
+      
+      const data = await response.json();
+      
+      if (data && data.address) {
+        // Extract relevant address components
+        const addressComponents = data.address;
+        const locality = addressComponents.suburb || 
+                        addressComponents.neighbourhood || 
+                        addressComponents.residential ||
+                        addressComponents.quarter ||
+                        addressComponents.city_district;
+        
+        const city = addressComponents.city || 
+                    addressComponents.town || 
+                    addressComponents.village;
+        
+        const state = addressComponents.state;
+        
+        // Format address
+        let formattedAddress = "";
+        if (locality) formattedAddress += locality;
+        if (city) formattedAddress += (formattedAddress ? ", " : "") + city;
+        if (state) formattedAddress += (formattedAddress ? ", " : "") + state;
+        
+        setAddress(formattedAddress || data.display_name);
+      } else {
+        setAddress("Address not found");
+      }
+    } catch (error) {
+      console.error("Reverse geocoding error:", error);
+      setAddress("Unable to fetch address");
+    } finally {
+      setAddressLoading(false);
+    }
+  };
   
 
   useEffect(() => {
@@ -57,12 +107,17 @@ function ReportIssuePage() {
         }
   
         navigator.geolocation.getCurrentPosition(
-          (position) => {
+          async (position) => {
+
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+
             setFormData((prev) => ({
               ...prev,
-              latitude: position.coords.latitude,
-              longitude: position.coords.longitude,
+              latitude: lat,
+              longitude: lng,
             }));
+            await reverseGeocode(lat, lng)
             setLocationLoading(false);
           },
           (err) => {
@@ -266,8 +321,16 @@ function ReportIssuePage() {
                   {locationLoading ? 'Fetching Location...' : 
                    formData.latitude ? 'Location Detected' : 'Location Required'}
                 </p>
+
+                {/* Show address if available */}
+                {address && !addressLoading && (
+                  <p className="text-md text-gray-800 font-medium mt-1">
+                    📍 {address}
+                  </p>
+                )}
+
                 {formData.latitude && (
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-gray-600 mt-1">
                     {formData.latitude.toFixed(6)}, {formData.longitude.toFixed(6)}
                   </p>
                 )}

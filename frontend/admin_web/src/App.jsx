@@ -7,7 +7,7 @@ import UserReports from './pages/UserReports';
 import ReportIssuePage from './pages/ReportIssuePage';
 import {Routes, Route, Navigate} from 'react-router-dom'
 import UserAccount from './pages/UserAccount';
-import Map from './pages/Map';
+import Map from './pages/Map'
 
 // Protected Route Component
 function AdminProtectedRoute({ children }) {
@@ -29,7 +29,8 @@ function App() {
         <Route path="/verify" element={<VerificationPage/>} />
         <Route path="/my-reports" element={<UserReports/>} />
         <Route path="/my-account" element={<UserAccount />} />
-        <Route path="/map" element={<Map />} />        
+        <Route path="/map" element={<Map />} />
+          
         {/* Protected Routes */}
         <Route path="/dashboard" element={
           <AdminProtectedRoute>

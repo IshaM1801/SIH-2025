@@ -138,11 +138,10 @@ function ReportIssuePage() {
     setLoading(true);
     setError("");
     setSuccess("");
-  //
+  
     if (
       !formData.issue_title ||
       !formData.issue_description ||
-      
       !formData.latitude ||
       !formData.longitude
     ) {
@@ -161,40 +160,49 @@ function ReportIssuePage() {
         return;
       }
   
-      // Create FormData for sending both text fields and image
+      // Create FormData
       const payload = new FormData();
       payload.append("issue_title", formData.issue_title);
       payload.append("issue_description", formData.issue_description);
-
       payload.append("latitude", formData.latitude);
       payload.append("longitude", formData.longitude);
       payload.append("created_by", user.id);
   
       if (selectedImage) {
-        payload.append("photo", selectedImage); // attach file
+        payload.append("photo", selectedImage);
       }
   
+      // 1️⃣ Submit issue
       const response = await fetch("http://localhost:5001/issues/create", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`, // DO NOT set Content-Type for FormData
-        },
+        headers: { Authorization: `Bearer ${token}` },
         body: payload,
       });
   
       const data = await response.json();
-  
       if (!response.ok) throw new Error(data.error || "Issue submission failed");
   
-      setSuccess("Issue reported successfully!");
-      setFormData((prev) => ({
-        ...prev,
-        issue_title: "",
-        issue_description: "",
-        department: "",
-      }));
+      // 2️⃣ Call classify-report
+      const classifyRes = await fetch("http://localhost:5001/issues/classify-report", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ reportId: data.issue.issue_id }),
+      });
+  
+      const classifyData = await classifyRes.json();
+      if (!classifyRes.ok) throw new Error(classifyData.error || "Classification failed");
+  
+      // ✅ Show department result
+      setSuccess(`Your report has been submitted to the ${classifyData.department} department.`);
+  
+      // Reset form
+      setFormData({ issue_title: "", issue_description: "", latitude: null, longitude: null });
       setSelectedImage(null);
       setImagePreview(null);
+  
     } catch (err) {
       setError(err.message);
     } finally {
@@ -390,11 +398,16 @@ function ReportIssuePage() {
         </form>
 
         {/* Helper Text */}
-        <div className="mt-6 text-center">
-          <p className="text-sm text-gray-500">
-            Your report will be reviewed and assigned to the appropriate department
-          </p>
-        </div>
+        {success && (
+  <Card className="mb-6 border-green-200 bg-green-50">
+    <CardContent className="p-4">
+      <div className="flex items-center space-x-2">
+        <CheckCircle className="w-5 h-5 text-green-500" />
+        <p className="text-green-700 font-medium">{success}</p>
+      </div>
+    </CardContent>
+  </Card>
+)}
       </div>
     </PWALayout>
   );

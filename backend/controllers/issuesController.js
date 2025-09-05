@@ -137,13 +137,11 @@ const createIssue = async (req, res) => {
 //  Fetch issues only of the logged-in user's department
 const getDeptIssues = async (req, res) => {
   try {
-    // ✅ Check what the JWT decoded to
     console.log("Decoded JWT:", req.user);
 
-    // Get employee email from decoded JWT
     const employeeEmail = req.user.email;
 
-    // Step 1: Find department of employee
+    // Get department of employee
     const { data: employee, error: empError } = await supabase
       .from("employee_registry")
       .select("dept_name")
@@ -154,17 +152,51 @@ const getDeptIssues = async (req, res) => {
       return res.status(403).json({ error: "Department not found for employee" });
     }
 
-    // Step 2: Fetch issues for that department
+    // Fetch issues for that department
     const { data: issues, error: issueError } = await supabase
       .from("issues")
-      .select("*")
+      .select("*") // include status, image_url, etc.
       .eq("department", employee.dept_name);
 
     if (issueError) throw issueError;
 
-    res.json({ issues });
+    // Optional: map to add extra info if needed (e.g., location lat/lon)
+    const issuesWithLocation = issues.map(issue => {
+      const loc = issue.location?.coordinates;
+      return {
+        ...issue,
+        latitude: loc ? loc[1] : null,
+        longitude: loc ? loc[0] : null,
+      };
+    });
+
+    res.json({ issues: issuesWithLocation });
   } catch (err) {
     console.error("getDeptIssues error:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// Add this function to issuesController.js
+const updateIssueStatus = async (req, res) => {
+  const { issueId } = req.params;
+  const { status } = req.body;
+
+  if (!status) return res.status(400).json({ error: 'Status is required' });
+
+  try {
+    const { data, error } = await supabase
+      .from('issues')
+      .update({ status })
+      .eq('issue_id', issueId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.json({ message: 'Status updated successfully', issue: data });
+  } catch (err) {
+    console.error('updateIssueStatus error:', err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -175,5 +207,6 @@ module.exports = {
   getAllIssues,
   getUserIssues,
   createIssue,
-  getDeptIssues 
+  getDeptIssues,
+  updateIssueStatus,
 };

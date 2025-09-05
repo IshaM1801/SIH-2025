@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Check } from 'lucide-react';
+import StatusDropdown from '@/components/ui/StatusDropdown';
 
 const DepartmentIssuesComponent = () => {
   const [selectedIssues, setSelectedIssues] = useState([]);
@@ -58,17 +59,8 @@ const DepartmentIssuesComponent = () => {
     });
   };
 
-  const getRandomStatus = () => {
-    const statuses = [
-      { name: 'Done', color: 'bg-green-100 text-green-700' },
-      { name: 'In progress', color: 'bg-blue-100 text-blue-700' },
-      { name: 'To do', color: 'bg-purple-100 text-purple-700' }
-    ];
-    return statuses[Math.floor(Math.random() * statuses.length)];
-  };
-
-  const doneCount = issues.filter(() => Math.random() > 0.6).length; // Mock count
-  const inProgressCount = issues.length - doneCount;
+  const doneCount = issues.filter(issue => issue.status === "Resolved").length;
+  const inProgressCount = issues.filter(issue => issue.status === "In Progress").length;
   const totalIssues = issues.length;
 
   if (loading) {
@@ -124,60 +116,63 @@ const DepartmentIssuesComponent = () => {
             No issues found for your department
           </div>
         ) : (
-          issues.map((issue) => {
-            const status = getRandomStatus();
-            return (
-              <div 
-                key={issue.issue_id}
-                className={`grid grid-cols-12 gap-4 items-center py-3 px-2 rounded-lg transition-colors ${
-                  selectedIssues.includes(issue.issue_id) ? 'bg-blue-50' : 'hover:bg-gray-50'
-                }`}
-              >
-                {/* Checkbox */}
-                <div className="col-span-1">
-                  <div 
-                    className={`w-5 h-5 rounded border-2 cursor-pointer flex items-center justify-center ${
-                      selectedIssues.includes(issue.issue_id) 
-                        ? 'bg-blue-500 border-blue-500' 
-                        : 'border-gray-300 bg-white'
-                    }`}
-                    onClick={() => toggleIssueSelection(issue.issue_id)}
-                  >
-                    {selectedIssues.includes(issue.issue_id) && (
-                      <Check className="w-3 h-3 text-white" />
-                    )}
-                  </div>
-                </div>
-
-                {/* Issue Title */}
-                <div className="col-span-4">
-                  <span className="text-gray-900 font-medium">{issue.issue_title}</span>
-                  <div className="text-xs text-gray-500 mt-1">{issue.department}</div>
-                </div>
-
-                {/* Description */}
-                <div className="col-span-3">
-                  <span className="text-gray-700 text-sm line-clamp-2">
-                    {issue.issue_description}
-                  </span>
-                </div>
-
-                {/* Status */}
-                <div className="col-span-2">
-                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${status.color}`}>
-                    {status.name}
-                  </span>
-                </div>
-
-                {/* Created At */}
-                <div className="col-span-2">
-                  <span className="px-2 py-1 rounded text-sm bg-gray-100 text-gray-700">
-                    {formatDate(issue.created_at)}
-                  </span>
+          issues.map((issue) => (
+            <div 
+              key={issue.issue_id}
+              className={`grid grid-cols-12 gap-4 items-center py-3 px-2 rounded-lg transition-colors ${
+                selectedIssues.includes(issue.issue_id) ? 'bg-blue-50' : 'hover:bg-gray-50'
+              }`}
+            >
+              {/* Checkbox */}
+              <div className="col-span-1">
+                <div 
+                  className={`w-5 h-5 rounded border-2 cursor-pointer flex items-center justify-center ${
+                    selectedIssues.includes(issue.issue_id) 
+                      ? 'bg-blue-500 border-blue-500' 
+                      : 'border-gray-300 bg-white'
+                  }`}
+                  onClick={() => toggleIssueSelection(issue.issue_id)}
+                >
+                  {selectedIssues.includes(issue.issue_id) && (
+                    <Check className="w-3 h-3 text-white" />
+                  )}
                 </div>
               </div>
-            );
-          })
+
+              {/* Issue Title */}
+              <div className="col-span-4">
+                <span className="text-gray-900 font-medium">{issue.issue_title}</span>
+                <div className="text-xs text-gray-500 mt-1">{issue.department}</div>
+              </div>
+
+              {/* Description */}
+              <div className="col-span-3">
+                <span className="text-gray-700 text-sm line-clamp-2">
+                  {issue.issue_description}
+                </span>
+              </div>
+
+              {/* Status */}
+              <div className="col-span-2">
+                <StatusDropdown
+                  issueId={issue.issue_id}
+                  currentStatus={issue.status}
+                  onStatusUpdated={(updatedIssue) => {
+                    setIssues(prev =>
+                      prev.map(i => i.issue_id === updatedIssue.issue_id ? updatedIssue : i)
+                    );
+                  }}
+                />
+              </div>
+
+              {/* Created At */}
+              <div className="col-span-2">
+                <span className="px-2 py-1 rounded text-sm bg-gray-100 text-gray-700">
+                  {formatDate(issue.created_at)}
+                </span>
+              </div>
+            </div>
+          ))
         )}
       </div>
     </div>

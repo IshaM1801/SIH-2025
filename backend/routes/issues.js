@@ -11,7 +11,8 @@ const {
   getAllIssues,
   getUserIssues,
   createIssue,
-  getDeptIssues
+  getDeptIssues,
+  updateIssueStatus,
 } = require('../controllers/issuesController');
 
 // Routes
@@ -19,5 +20,6 @@ router.get('/', authMiddleware, getAllIssues);
 router.get('/user/:userId', authMiddleware, getUserIssues);
 router.post('/create', authMiddleware, upload.single("photo"), createIssue);
 router.get('/dept', authMiddleware, getDeptIssues);
+router.patch('/update-status/:issueId', authMiddleware, updateIssueStatus);
 //
 module.exports = router;

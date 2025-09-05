@@ -153,7 +153,7 @@ function ReportIssuePage() {
     setLoading(true);
     setError("");
     setSuccess("");
-  //.
+  //
     if (
       !formData.issue_title ||
       !formData.issue_description ||

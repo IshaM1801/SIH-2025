@@ -22,7 +22,7 @@ function ReportIssuePage() {
   const [formData, setFormData] = useState({
     issue_title: "",
     issue_description: "",
-    department: "",
+  
     latitude: null,
     longitude: null,
   });
@@ -36,18 +36,7 @@ function ReportIssuePage() {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
 
   // Department options
-  const departments = [
-    "Public Works",
-    "Traffic Management",
-    "Water & Sanitation",
-    "Waste Management",
-    "Parks & Recreation",
-    "Road Maintenance",
-    "Street Lighting",
-    "Building Permits",
-    "Public Safety",
-    "Environmental Services"
-  ];
+  
 
   useEffect(() => {
     const fetchLocation = async () => {
@@ -100,11 +89,7 @@ function ReportIssuePage() {
     setSuccess("");
   };
 
-  const handleDepartmentChange = (value) => {
-    setFormData(prev => ({ ...prev, department: value }));
-    setError("");
-    setSuccess("");
-  };
+ 
 
   const handleImageCapture = () => {
     const input = document.createElement('input');
@@ -157,7 +142,7 @@ function ReportIssuePage() {
     if (
       !formData.issue_title ||
       !formData.issue_description ||
-      !formData.department ||
+      
       !formData.latitude ||
       !formData.longitude
     ) {
@@ -180,7 +165,7 @@ function ReportIssuePage() {
       const payload = new FormData();
       payload.append("issue_title", formData.issue_title);
       payload.append("issue_description", formData.issue_description);
-      payload.append("department", formData.department);
+
       payload.append("latitude", formData.latitude);
       payload.append("longitude", formData.longitude);
       payload.append("created_by", user.id);
@@ -321,33 +306,6 @@ function ReportIssuePage() {
                   required
                 />
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Department Selection */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center space-x-2">
-                <Building className="w-5 h-5" />
-                <span>Department</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <label className="text-sm font-medium text-gray-700 mb-2 block">
-                Select Relevant Department *
-              </label>
-              <Select value={formData.department} onValueChange={handleDepartmentChange}>
-                <SelectTrigger className="h-12">
-                  <SelectValue placeholder="Choose department" />
-                </SelectTrigger>
-                <SelectContent>
-                  {departments.map((dept) => (
-                    <SelectItem key={dept} value={dept}>
-                      {dept}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </CardContent>
           </Card>
 

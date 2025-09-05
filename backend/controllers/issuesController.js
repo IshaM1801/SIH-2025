@@ -60,14 +60,14 @@ const createIssue = async (req, res) => {
     const user = req.user; // Comes from authMiddleware
     const created_by = user.id;
 
-    // Handle uploaded file (optional, if using multer)
+    // 🔹 Handle uploaded file (if using multer)
     let imageUrl = null;
     if (req.file) {
       const file = req.file;
       const fileExt = file.originalname.split(".").pop();
       const fileName = `issues/${Date.now()}.${fileExt}`;
 
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from("issue-photos")
         .upload(fileName, file.buffer, {
           cacheControl: "3600",
@@ -84,46 +84,16 @@ const createIssue = async (req, res) => {
       imageUrl = publicData.publicUrl;
     }
 
-    // Get client IP
-    let clientIp =
-      req.headers["x-forwarded-for"]?.split(",")[0] || req.socket.remoteAddress;
-
-    // Fallback if localhost
-    if (clientIp === "::1" || clientIp === "127.0.0.1") {
-      clientIp = "8.8.8.8"; // Example fallback IP
-    }
-
-    // Call Ambee Geolocation API
-    const ambeeApiKey = "17a5ef9024968d4934217a74dc987394313f247569767fd3570ab8349162f96e";
-    const geoUrl = `https://api.ambeedata.com/geo/ip/${clientIp}`;
-
-    let latitude = null;
-    let longitude = null;
-
-    try {
-      const geoResponse = await axios.get(geoUrl, {
-        headers: { "x-api-key": ambeeApiKey },
-      });
-      latitude = geoResponse.data?.data?.latitude || null;
-      longitude = geoResponse.data?.data?.longitude || null;
-    } catch (geoErr) {
-      console.warn("Ambee geolocation API failed:", geoErr.message);
-    }
-
-    // Insert issue into Supabase
-    const { data, error } = await supabase
+    // 🔹 Insert issue into Supabase
+    const { data: issue, error } = await supabase
       .from("issues")
       .insert([
         {
           issue_title,
           issue_description,
           created_by,
-          department: department || null,
+          department: department || null, // leave null if not provided
           image_url: imageUrl,
-          location:
-            latitude && longitude
-              ? `SRID=4326;POINT(${longitude} ${latitude})`
-              : null,
         },
       ])
       .select()
@@ -131,12 +101,40 @@ const createIssue = async (req, res) => {
 
     if (error) throw error;
 
-    res.status(201).json({ message: "Issue created successfully", issue: data });
+    // 🔹 Auto-classify ONLY if department was not given
+    if (!department && issue.image_url) {
+      try {
+        const fastApiRes = await axios.post("http://127.0.0.1:8000/predict_url", {
+          image_url: issue.image_url,
+        });
+
+        if (fastApiRes.data && fastApiRes.data.predicted_class) {
+          const predictedDept = fastApiRes.data.predicted_class;
+
+          const { error: updateError } = await supabase
+            .from("issues")
+            .update({ department: predictedDept })
+            .eq("issue_id", issue.issue_id);
+
+          if (!updateError) {
+            issue.department = predictedDept; // update response object
+          }
+        }
+      } catch (clsErr) {
+        console.error("Auto classification failed:", clsErr.message);
+      }
+    }
+
+    res.status(201).json({
+      message: "✅ Issue created successfully",
+      issue,
+    });
   } catch (err) {
     console.error("createIssue error:", err);
     res.status(500).json({ error: err.message });
   }
 };
+
 
 
 //  Fetch issues only of the logged-in user's department
@@ -206,7 +204,53 @@ const updateIssueStatus = async (req, res) => {
   }
 };
 
+const classifyReport = async (req, res) => {
+  try {
+    const { reportId } = req.body;
 
+    // 1. Fetch report from Supabase
+    const { data: report, error } = await supabase
+      .from("issues")
+      .select("issue_id, image_url")
+      .eq("issue_id", reportId)
+      .single();
+
+    if (error || !report) {
+      return res.status(404).json({ error: "Report not found" });
+    }
+
+    // 2. Send image_url to FastAPI
+    const fastApiRes = await axios.post("http://127.0.0.1:8000/predict_url", {
+      image_url: report.image_url,
+    });
+
+    if (!fastApiRes.data || !fastApiRes.data.predicted_class) {
+      return res.status(500).json({ error: "FastAPI did not return a prediction" });
+    }
+
+    const predictedDept = fastApiRes.data.predicted_class;
+
+    // 3. Update Supabase issues table
+    const { error: updateError } = await supabase
+      .from("issues")
+      .update({ department: predictedDept })
+      .eq("issue_id", reportId);
+
+    if (updateError) {
+      return res.status(500).json({ error: "Failed to update department in Supabase" });
+    }
+
+    res.json({
+      success: true,
+      reportId,
+      department: predictedDept,
+      fastApiResponse: fastApiRes.data,
+    });
+  } catch (err) {
+    console.error("Classification error:", err.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
 
 module.exports = {
   getAllIssues,
@@ -214,4 +258,5 @@ module.exports = {
   createIssue,
   getDeptIssues,
   updateIssueStatus,
+  classifyReport,
 };

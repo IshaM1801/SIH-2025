@@ -50,24 +50,24 @@ const getUserIssues = async (req, res) => {
 };
 
 const createIssue = async (req, res) => {
-  const { issue_title, issue_description, department } = req.body;
-
-  if (!issue_title || !issue_description) {
-    return res.status(400).json({ error: "Missing required fields" });
-  }
-
   try {
-    const user = req.user; // Comes from authMiddleware
+    const { issue_title, issue_description, department } = req.body;
+    const user = req.user; 
     const created_by = user.id;
 
-    // 🔹 Handle uploaded file (if using multer)
+    if (!issue_title || !issue_description) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    // Handle uploaded file
     let imageUrl = null;
     if (req.file) {
-      const file = req.file;
+      const file = req.file; // multer file object
       const fileExt = file.originalname.split(".").pop();
       const fileName = `issues/${Date.now()}.${fileExt}`;
 
-      const { error: uploadError } = await supabase.storage
+      // Upload to Supabase Storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
         .from("issue-photos")
         .upload(fileName, file.buffer, {
           cacheControl: "3600",
@@ -77,6 +77,7 @@ const createIssue = async (req, res) => {
 
       if (uploadError) throw uploadError;
 
+      // Get public URL
       const { data: publicData } = supabase.storage
         .from("issue-photos")
         .getPublicUrl(fileName);
@@ -84,16 +85,36 @@ const createIssue = async (req, res) => {
       imageUrl = publicData.publicUrl;
     }
 
-    // 🔹 Insert issue into Supabase
-    const { data: issue, error } = await supabase
+    // Get client IP
+    let clientIp =
+      req.headers["x-forwarded-for"]?.split(",")[0] || req.socket.remoteAddress;
+
+    if (clientIp === "::1" || clientIp === "127.0.0.1") {
+      clientIp = "8.8.8.8"; // fallback IP
+    }
+
+    const apiKey = process.env.IPGEO_API_KEY; 
+    const geoUrl = `https://api.ipgeolocation.io/v2/ipgeo?apiKey=${apiKey}&ip=${clientIp}&fields=location`;
+
+    const geoResponse = await axios.get(geoUrl);
+    const locationData = geoResponse.data.location;
+    const latitude = locationData.latitude;
+    const longitude = locationData.longitude;
+
+    // Insert issue into Supabase
+    const { data, error } = await supabase
       .from("issues")
       .insert([
         {
           issue_title,
           issue_description,
           created_by,
-          department: department || null, // leave null if not provided
-          image_url: imageUrl,
+          department: department || null,
+          image_url: imageUrl, // store image URL
+          location:
+            latitude && longitude
+              ? `SRID=4326;POINT(${longitude} ${latitude})`
+              : null,
         },
       ])
       .select()
@@ -101,40 +122,13 @@ const createIssue = async (req, res) => {
 
     if (error) throw error;
 
-    // 🔹 Auto-classify ONLY if department was not given
-    if (!department && issue.image_url) {
-      try {
-        const fastApiRes = await axios.post("http://127.0.0.1:8000/predict_url", {
-          image_url: issue.image_url,
-        });
+    res.status(201).json({ message: "Issue created successfully", issue: data });
 
-        if (fastApiRes.data && fastApiRes.data.predicted_class) {
-          const predictedDept = fastApiRes.data.predicted_class;
-
-          const { error: updateError } = await supabase
-            .from("issues")
-            .update({ department: predictedDept })
-            .eq("issue_id", issue.issue_id);
-
-          if (!updateError) {
-            issue.department = predictedDept; // update response object
-          }
-        }
-      } catch (clsErr) {
-        console.error("Auto classification failed:", clsErr.message);
-      }
-    }
-
-    res.status(201).json({
-      message: "✅ Issue created successfully",
-      issue,
-    });
   } catch (err) {
     console.error("createIssue error:", err);
     res.status(500).json({ error: err.message });
   }
 };
-
 
 
 //  Fetch issues only of the logged-in user's department

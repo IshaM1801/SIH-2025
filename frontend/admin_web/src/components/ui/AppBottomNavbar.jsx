@@ -9,7 +9,7 @@ function BottomNavbar() {
   const getActiveTab = () => {
     const path = location.pathname;
     if (path === "/issues") return "home";
-    if (path === "/my-issues") return "my-issues";
+    if (path === "/my-issues" || path === "/my-reports") return "my-reports"; // ✅ Fix: Handle both paths
     if (path === "/report-issue") return "report";
     if (path === "/my-account") return "account";
     return "home";
@@ -23,10 +23,10 @@ function BottomNavbar() {
       path: "/issues",
     },
     {
-      id: "my-issues",
-      label: "My Issues",
+      id: "my-reports",
+      label: "My Reports",
       icon: FileText,
-      path: "/my-issues",
+      path: "/my-reports",
     },
     {
       id: "report",

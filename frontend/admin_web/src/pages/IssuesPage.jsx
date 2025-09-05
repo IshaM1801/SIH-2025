@@ -198,7 +198,7 @@ function IssuesPage() {
             </Button>
             
             <Button 
-              onClick={() => navigate("/my-issues")} 
+              onClick={() => navigate("/my-reports")} 
               className="w-full justify-start h-12"
               variant="outline"
             >

@@ -19,5 +19,5 @@ router.get('/', authMiddleware, getAllIssues);
 router.get('/user/:userId', authMiddleware, getUserIssues);
 router.post('/create', authMiddleware, upload.single("photo"), createIssue);
 router.get('/dept', authMiddleware, getDeptIssues);
-
+//.
 module.exports = router;

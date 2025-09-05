@@ -1,14 +1,75 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   BarChart, Bar, XAxis, YAxis, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell 
 } from 'recharts';
 import { 
   Search, Bell, Users, Shield, DollarSign, RefreshCw, HelpCircle, FileText,
-  MapPin, Settings, MessageSquare, BookOpen, Award, Eye
+  MapPin, Settings, MessageSquare, BookOpen, Award, Eye, LogOut
 } from 'lucide-react';
 import DepartmentIssuesComponent from '@/components/ui/DepartmentIssues';
 
 const Dashboard = () => {
+  const navigate = useNavigate();
+  
+  // Add state for admin data
+  const [adminData, setAdminData] = useState(null);
+
+  // Fetch admin data on component mount
+  useEffect(() => {
+    const storedAdminData = localStorage.getItem("adminUser");
+    if (storedAdminData) {
+      try {
+        const parsedData = JSON.parse(storedAdminData);
+        setAdminData(parsedData);
+      } catch (error) {
+        console.error("Error parsing admin data:", error);
+      }
+    }
+  }, []);
+
+  // Get admin name from localStorage
+  const getAdminName = () => {
+    if (adminData?.name) {
+      return adminData.name;
+    }
+    if (adminData?.employee?.name) {
+      return adminData.employee.name;
+    }
+    return "Admin User"; // fallback
+  };
+
+  // Get admin initials
+  const getAdminInitials = () => {
+    const name = getAdminName();
+    const nameParts = name.split(' ');
+    if (nameParts.length >= 2) {
+      return `${nameParts[0][0]}${nameParts[1][0]}`.toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
+  };
+
+  // Get admin department/role
+  const getAdminRole = () => {
+    if (adminData?.dept_name) {
+      return adminData.dept_name;
+    }
+    if (adminData?.employee?.dept_name) {
+      return adminData.employee.dept_name;
+    }
+    return "Administration"; // fallback
+  };
+
+  // Add logout function
+  const handleLogout = () => {
+    // Clear all admin-related data from localStorage
+    localStorage.removeItem("adminUser");
+    localStorage.removeItem("employee_token");
+    
+    // Redirect to login page
+    navigate("/login");
+  };
+
   // Data for civic issue reporting system
   const reportsByDistrictData = [
     { month: 'Jan', reports: 185, resolved: 152 },
@@ -71,6 +132,19 @@ const Dashboard = () => {
               <h1 className="text-xl font-semibold text-gray-900 truncate">Dashboard</h1>
             </div>
             
+            {/* Admin Info Card */}
+            <div className="bg-blue-50 rounded-xl p-4 mb-6 border border-blue-200">
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
+                  <span className="text-white text-sm font-semibold">{getAdminInitials()}</span>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium text-gray-900 truncate">{getAdminName()}</div>
+                  <div className="text-xs text-gray-600 truncate">{getAdminRole()}</div>
+                </div>
+              </div>
+            </div>
+            
             <nav className="space-y-2">
               {sidebarItems.map((item, index) => (
                 <div
@@ -91,42 +165,34 @@ const Dashboard = () => {
 
         {/* Main Content */}
         <div className="flex-1 flex flex-col min-w-0">
-          {/* Top Navbar */}
+          {/* Top Navbar - Updated with logout button */}
           <div className="bg-white border-b border-gray-200 flex flex-col xl:flex-row xl:items-center xl:justify-between px-4 xl:px-8 py-4 xl:py-6 shadow-sm">
             <h2 className="text-xl xl:text-2xl font-bold text-gray-900 mb-4 xl:mb-0 truncate min-w-0">
               Civic Issue Management Dashboard
             </h2>
             
             <div className="flex flex-col xl:flex-row xl:items-center space-y-4 xl:space-y-0 xl:space-x-6 min-w-0">
-              <div className="relative flex-shrink-0">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search"
-                  className="pl-10 pr-4 py-2 w-full xl:w-64 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-              
-              <div className="flex flex-col xl:flex-row xl:items-center space-y-3 xl:space-y-0 xl:space-x-4 min-w-0">
-                <select className="px-4 py-2 border border-gray-300 rounded-xl text-sm min-w-[160px] truncate">
-                  <option>District Jamshoro</option>
-                </select>
-                
-                <div className="hidden xl:flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-xl flex-shrink-0">
-                  <span className="text-sm text-gray-600 whitespace-nowrap">Custom Date Range</span>
-                </div>
-              </div>
               
               <div className="flex items-center space-x-4 flex-shrink-0">
                 <Bell className="w-6 h-6 text-gray-500 cursor-pointer hover:text-gray-700 transition-colors" />
                 
+                {/* Add logout button before user avatar */}
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center space-x-2 px-3 py-2 text-sm text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                  title="Logout"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span className="hidden sm:inline">Logout</span>
+                </button>
+                
                 <div className="flex items-center space-x-3">
                   <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
-                    <span className="text-white text-sm font-semibold">JA</span>
+                    <span className="text-white text-sm font-semibold">{getAdminInitials()}</span>
                   </div>
-                  <div className="hidden xl:block min-w-0">
-                    <div className="text-sm font-medium text-gray-900 truncate">Jamshed Ahmed</div>
-                    <div className="text-xs text-gray-500 truncate">Admin</div>
+                  <div className="block min-w-0">
+                    <div className="text-sm font-medium text-gray-900 truncate">{getAdminName()}</div>
+                    <div className="text-xs text-gray-500 truncate">{getAdminRole()}</div>
                   </div>
                 </div>
               </div>

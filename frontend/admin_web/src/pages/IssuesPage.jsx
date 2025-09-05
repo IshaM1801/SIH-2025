@@ -3,11 +3,10 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import PWALayout from "@/components/ui/PWALayout";
 import { 
-  Home, 
   FileText, 
   PlusCircle, 
-  User, 
   MapPin, 
   Clock, 
   CheckCircle,
@@ -34,21 +33,19 @@ function IssuesPage() {
   }, []);
 
   const getUserName = () => {
-    if (userData?.user?.user_metadata?.name) {
-      return userData.user.user_metadata.name;
+    if (userData?.user_metadata?.email) {
+      const email = userData.user_metadata.email;
+      const nameFromEmail = email.split('@')[0];
+      return nameFromEmail
+        .replace(/[._-]/g, ' ')
+        .split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(' ');
     }
     if (userData?.profile?.name) {
       return userData.profile.name;
     }
     return "User";
-  };
-
-  const getActiveTab = () => {
-    const path = location.pathname;
-    if (path === "/my-issues") return "my-issues";
-    if (path === "/report-issue") return "report";
-    if (path === "/my-account") return "account";
-    return "home";
   };
 
   // Mock data for dashboard stats
@@ -113,29 +110,8 @@ function IssuesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
-      {/* Fixed Top Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm">
-        <div className="flex items-center justify-between px-4 py-3">
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <div className="w-5 h-5 bg-white rounded-sm"></div>
-            </div>
-            <h1 className="text-xl font-bold text-gray-900">FixMyCity</h1>
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-              <span className="text-white text-sm font-semibold">
-                {getUserName().charAt(0).toUpperCase()}
-              </span>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="pt-16 px-4 pb-6">
+    <PWALayout title="FixMyCity" showNotifications={true}>
+      <div className="px-4 pb-6">
         {/* Welcome Section */}
         <div className="mb-6">
           <h2 className="text-2xl font-bold text-gray-900 mb-2">
@@ -155,8 +131,8 @@ function IssuesPage() {
                   <FileText className="w-5 h-5 text-blue-600" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-gray-900">{dashboardStats.totalReports}</p>
-                  <p className="text-sm text-gray-600">Total Reports</p>
+                  <p className="text-2xl text-center font-bold text-gray-900">{dashboardStats.totalReports}</p>
+                  <p className="text-xs text-gray-600">Total Reports</p>
                 </div>
               </div>
             </CardContent>
@@ -169,7 +145,7 @@ function IssuesPage() {
                   <CheckCircle className="w-5 h-5 text-green-600" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-gray-900">{dashboardStats.resolvedReports}</p>
+                  <p className="text-2xl text-center font-bold text-gray-900">{dashboardStats.resolvedReports}</p>
                   <p className="text-sm text-gray-600">Resolved</p>
                 </div>
               </div>
@@ -183,7 +159,7 @@ function IssuesPage() {
                   <Clock className="w-5 h-5 text-yellow-600" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-gray-900">{dashboardStats.pendingReports}</p>
+                  <p className="text-2xl text-center font-bold text-gray-900">{dashboardStats.pendingReports}</p>
                   <p className="text-sm text-gray-600">Pending</p>
                 </div>
               </div>
@@ -197,7 +173,7 @@ function IssuesPage() {
                   <TrendingUp className="w-5 h-5 text-blue-600" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-gray-900">{dashboardStats.inProgressReports}</p>
+                  <p className="text-2xl text-center font-bold text-gray-900">{dashboardStats.inProgressReports}</p>
                   <p className="text-sm text-gray-600">In Progress</p>
                 </div>
               </div>
@@ -282,61 +258,8 @@ function IssuesPage() {
             )}
           </CardContent>
         </Card>
-      </main>
-
-      {/* Fixed Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 shadow-lg">
-        <div className="grid grid-cols-4 h-16">
-          <button
-            onClick={() => navigate("/issues")}
-            className={`flex flex-col items-center justify-center space-y-1 ${
-              getActiveTab() === "home" 
-                ? "text-blue-600 bg-blue-50" 
-                : "text-gray-600 hover:text-gray-900"
-            }`}
-          >
-            <Home className="w-5 h-5" />
-            <span className="text-xs font-medium">Home</span>
-          </button>
-
-          <button
-            onClick={() => navigate("/my-issues")}
-            className={`flex flex-col items-center justify-center space-y-1 ${
-              getActiveTab() === "my-issues" 
-                ? "text-blue-600 bg-blue-50" 
-                : "text-gray-600 hover:text-gray-900"
-            }`}
-          >
-            <FileText className="w-5 h-5" />
-            <span className="text-xs font-medium">My Issues</span>
-          </button>
-          //.
-          <button
-            onClick={() => navigate("/report-issue")}
-            className={`flex flex-col items-center justify-center space-y-1 ${
-              getActiveTab() === "report" 
-                ? "text-blue-600 bg-blue-50" 
-                : "text-gray-600 hover:text-gray-900"
-            }`}
-          >
-            <PlusCircle className="w-5 h-5" />
-            <span className="text-xs font-medium">Report</span>
-          </button>
-
-          <button
-            onClick={() => navigate("/my-account")}
-            className={`flex flex-col items-center justify-center space-y-1 ${
-              getActiveTab() === "account" 
-                ? "text-blue-600 bg-blue-50" 
-                : "text-gray-600 hover:text-gray-900"
-            }`}
-          >
-            <User className="w-5 h-5" />
-            <span className="text-xs font-medium">Account</span>
-          </button>
-        </div>
-      </nav>
-    </div>
+      </div>
+    </PWALayout>
   );
 }
 

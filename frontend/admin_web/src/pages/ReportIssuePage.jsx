@@ -211,7 +211,7 @@ function ReportIssuePage() {
   };
 
   return (
-    <PWALayout title="Report Issue" showNotifications={false}>
+    <PWALayout title="Report Issue" showNotifications={true}>
       <div className="px-4 pb-6">
         {/* Header */}
         <div className="mb-6">

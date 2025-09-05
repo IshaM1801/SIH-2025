@@ -18,44 +18,27 @@ function ReportIssuePage() {
   const userId = user?.id;
 
   useEffect(() => {
-    const fetchLocation = async () => {
-      if (!navigator.geolocation) {
-        setError("Geolocation is not supported by your browser");
-        return;
-      }
-
+    const fetchLocationFromIP = async () => {
       try {
-        const permissionStatus = await navigator.permissions.query({
-          name: "geolocation",
-        });
-        if (permissionStatus.state === "denied") {
-          setError(
-            "Location access is denied. Please enable it in browser settings."
-          );
-          return;
-        }
+        const res = await fetch("https://ipapi.co/json/");
+        const data = await res.json();
 
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            setFormData((prev) => ({
-              ...prev,
-              latitude: position.coords.latitude,
-              longitude: position.coords.longitude,
-            }));
-          },
-          (err) => {
-            console.error("Geolocation error:", err);
-            setError("Could not fetch location. Please allow location access.");
-          },
-          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-        );
+        if (data && data.latitude && data.longitude) {
+          setFormData((prev) => ({
+            ...prev,
+            latitude: data.latitude,
+            longitude: data.longitude,
+          }));
+        } else {
+          setError("Could not fetch location from IP");
+        }
       } catch (err) {
-        console.error("Permission error:", err);
-        setError("Could not fetch location. Please allow location access.");
+        console.error("IP geolocation error:", err);
+        setError("Could not fetch location from IP");
       }
     };
 
-    fetchLocation();
+    fetchLocationFromIP();
   }, []);
 
   const handleInputChange = (e) => {
@@ -112,7 +95,6 @@ function ReportIssuePage() {
 
       if (!res.ok) {
         if (res.status === 409) {
-          // 🔴 Duplicate issue detected
           throw new Error(
             "⚠️ This issue has already been reported at this location."
           );

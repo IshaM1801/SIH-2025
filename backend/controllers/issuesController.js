@@ -61,18 +61,36 @@ const createIssue = async (req, res) => {
     const user = req.user; 
     const created_by = user.id;
 
+    // Handle uploaded file (multer puts file in req.file)
+    let imageUrl = null;
+    if (req.file) {
+      const file = req.file; // multer memoryStorage object
+      const fileExt = file.originalname.split(".").pop();
+      const fileName = `issues/${Date.now()}.${fileExt}`;
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from("issue-photos")
+        .upload(fileName, file.buffer, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType: file.mimetype,
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: publicData } = supabase.storage
+        .from("issue-photos")
+        .getPublicUrl(fileName);
+
+      imageUrl = publicData.publicUrl;
+    }
+
     // Get client IP
     let clientIp =
       req.headers["x-forwarded-for"]?.split(",")[0] || req.socket.remoteAddress;
 
-    // If localhost, fallback to public IP
     if (clientIp === "::1" || clientIp === "127.0.0.1") {
-      // Option 1: Use a fixed public IP for testing
-      clientIp = "8.8.8.8";
-
-      // Option 2: Fetch your real public IP dynamically (uncomment below)
-      // const ipRes = await axios.get("https://api.ipify.org?format=json");
-      // clientIp = ipRes.data.ip;
+      clientIp = "8.8.8.8"; // fallback for localhost
     }
 
     // Call IP Geolocation API
@@ -94,6 +112,7 @@ const createIssue = async (req, res) => {
           issue_description,
           created_by,
           department: department || null,
+          image_url: imageUrl, // store the uploaded image URL
           location:
             latitude && longitude
               ? `SRID=4326;POINT(${longitude} ${latitude})`

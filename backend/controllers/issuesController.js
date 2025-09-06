@@ -125,38 +125,26 @@ const createIssue = async (req, res) => {
 // Fetch issues only of the logged-in user's department
 const getDeptIssues = async (req, res) => {
   try {
-    console.log("Decoded JWT:", req.user);
-
     const employeeEmail = req.user.email;
 
-    // Get department of employee
+    // Get logged-in employee's team
     const { data: employee, error: empError } = await supabase
       .from("employee_registry")
-      .select("dept_name")
+      .select("team_name")
       .eq("emp_email", employeeEmail)
       .single();
 
-    if (empError || !employee) {
-      return res.status(403).json({ error: "Department not found for employee" });
+    if (empError || !employee || !employee.team_name) {
+      return res.status(403).json({ error: "Employee not found or team not set" });
     }
 
-    // Fetch issues for that department
-    const { data: issues, error: issueError } = await supabase
-      .from("issues")
-      .select("*") // include status, image_url, latitude, longitude, address_component, etc.
-      .eq("department", employee.dept_name);
+    // Call the Postgres function
+    const { data: issues, error } = await supabase
+      .rpc("get_issues_within_team_radius", { p_team_name: employee.team_name });
 
-    if (issueError) throw issueError;
+    if (error) throw error;
 
-    // Map issues to include lat/lng and address component explicitly
-    const issuesWithLocation = issues.map(issue => ({
-      ...issue,
-      latitude: issue.latitude || null,
-      longitude: issue.longitude || null,
-      address_component: issue.address_component || null,
-    }));
-
-    res.json({ issues: issuesWithLocation });
+    res.json({ issues });
   } catch (err) {
     console.error("getDeptIssues error:", err);
     res.status(500).json({ error: err.message });

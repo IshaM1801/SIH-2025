@@ -140,27 +140,52 @@ const Maps = () => {
           )
       )}
 
-      {selectedMarker && (
-        <InfoWindow
-          position={{ lat: selectedMarker.latitude, lng: selectedMarker.longitude }}
-          onCloseClick={() => setSelectedMarker(null)}
-        >
-          <div style={{ maxWidth: "250px" }}>
-            <h3>{selectedMarker.issue_title}</h3>
-            <p>
-              <strong>Locality:</strong> {selectedMarker.locality || "Unknown"}
-            </p>
-            <p>{selectedMarker.issue_description}</p>
-            {selectedMarker.image_url && (
-              <img
-                src={selectedMarker.image_url}
-                alt="issue"
-                style={{ width: "100%", marginTop: "5px", borderRadius: "5px" }}
-              />
-            )}
-          </div>
-        </InfoWindow>
+{selectedMarker && (
+  <InfoWindow
+    position={{ lat: selectedMarker.latitude, lng: selectedMarker.longitude }}
+    onCloseClick={() => setSelectedMarker(null)}
+  >
+    <div style={{ maxWidth: "300px", fontFamily: "Arial, sans-serif", lineHeight: "1.4" }}>
+      <h3 style={{ marginBottom: "8px", color: "#1a73e8" }}>
+        Issue Title
+      </h3>
+      <p style={{ fontWeight: "bold", margin: "0 0 10px 0" }}>
+        {selectedMarker.issue_title}
+      </p>
+
+      <h4 style={{ marginBottom: "4px", color: "#1a73e8" }}>
+        Description
+      </h4>
+      <p style={{ margin: "0 0 10px 0" }}>
+        {selectedMarker.issue_description}
+      </p>
+
+      <h4 style={{ marginBottom: "4px", color: "#1a73e8" }}>
+        Locality
+      </h4>
+      <p style={{ margin: "0 0 10px 0" }}>
+        {selectedMarker.locality || "Unknown"}
+      </p>
+
+      {selectedMarker.image_url && (
+        <>
+          <h4 style={{ marginBottom: "4px", color: "#1a73e8" }}>
+            Image
+          </h4>
+          <img
+            src={selectedMarker.image_url}
+            alt="issue"
+            style={{
+              width: "100%",
+              borderRadius: "6px",
+              boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
+            }}
+          />
+        </>
       )}
+    </div>
+  </InfoWindow>
+)}
     </GoogleMap>
   );
 };

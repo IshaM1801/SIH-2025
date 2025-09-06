@@ -215,7 +215,7 @@ function UserReports() {
                     <FileText className="w-5 h-5 text-blue-600" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+                    <p className="text-2xl text-center font-bold text-gray-900">{stats.total}</p>
                     <p className="text-xs text-gray-600">Total Reports</p>
                   </div>
                 </div>
@@ -229,7 +229,7 @@ function UserReports() {
                     <CheckCircle className="w-5 h-5 text-green-600" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-gray-900">{stats.resolved}</p>
+                    <p className="text-2xl text-center font-bold text-gray-900">{stats.resolved}</p>
                     <p className="text-xs text-gray-600">Resolved</p>
                   </div>
                 </div>
@@ -243,7 +243,7 @@ function UserReports() {
                     <Clock className="w-5 h-5 text-yellow-600" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-gray-900">{stats.pending}</p>
+                    <p className="text-2xl text-center font-bold text-gray-900">{stats.pending}</p>
                     <p className="text-xs text-gray-600">Pending</p>
                   </div>
                 </div>
@@ -257,7 +257,7 @@ function UserReports() {
                     <RefreshCw className="w-5 h-5 text-blue-600" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-gray-900">{stats.inProgress}</p>
+                    <p className="text-2xl text-center font-bold text-gray-900">{stats.inProgress}</p>
                     <p className="text-xs text-gray-600">In Progress</p>
                   </div>
                 </div>

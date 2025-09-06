@@ -41,8 +41,19 @@ function ReportIssuePage() {
 
   // Reverse geocoding function
   // Reverse geocoding function using OpenCage
+// Simple cache object
+const geocodeCache = {};
+
 const reverseGeocode = async (lat, lng) => {
   setAddressLoading(true);
+
+  const cacheKey = `${lat.toFixed(6)},${lng.toFixed(6)}`;
+  if (geocodeCache[cacheKey]) {
+    setAddress(geocodeCache[cacheKey]);
+    setAddressLoading(false);
+    return;
+  }
+
   try {
     const response = await fetch(
       `https://api.opencagedata.com/geocode/v1/json?q=${lat}+${lng}&key=ceefcaa44fd14d259322d6c1000b06c3&no_annotations=1`,
@@ -50,10 +61,11 @@ const reverseGeocode = async (lat, lng) => {
 
     const data = await response.json();
 
+    let formattedAddress = "Address not found";
+
     if (data && data.results && data.results.length > 0) {
       const components = data.results[0].components;
 
-      // Extract relevant address components
       const locality =
         components.suburb ||
         components.neighbourhood ||
@@ -64,16 +76,17 @@ const reverseGeocode = async (lat, lng) => {
 
       const state = components.state;
 
-      // Format address
-      let formattedAddress = "";
-      if (locality) formattedAddress += locality;
-      if (city) formattedAddress += (formattedAddress ? ", " : "") + city;
-      if (state) formattedAddress += (formattedAddress ? ", " : "") + state;
-
-      setAddress(formattedAddress || data.results[0].formatted);
-    } else {
-      setAddress("Address not found");
+      formattedAddress =
+        (locality ? locality : "") +
+        (city ? (formattedAddress ? ", " : "") + city : "") +
+        (state ? (formattedAddress ? ", " : "") + state : "") ||
+        data.results[0].formatted;
     }
+
+    // Store in cache
+    geocodeCache[cacheKey] = formattedAddress;
+    console.log("Cache contents:", geocodeCache);
+    setAddress(formattedAddress);
   } catch (error) {
     console.error("OpenCage reverse geocoding error:", error);
     setAddress("Unable to fetch address");
@@ -81,7 +94,6 @@ const reverseGeocode = async (lat, lng) => {
     setAddressLoading(false);
   }
 };
-  
 
   useEffect(() => {
     const fetchLocation = async () => {

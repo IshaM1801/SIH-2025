@@ -70,11 +70,21 @@ export default function VerifyPage() {
       setMessage("Please fill both fields");
       return;
     }
-
+  
     try {
+      const token = localStorage.getItem("token"); // get token from localStorage
+  
+      if (!token) {
+        setMessage("User not logged in or verified yet");
+        return;
+      }
+  
       const res = await fetch("http://localhost:5001/auth/complete-profile", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}` // pass token to backend
+        },
         body: JSON.stringify({ name, phone }),
       });
       

@@ -99,6 +99,31 @@ const login = async (req, res) => {
 module.exports = { login };
 
 // ------------------ VERIFY TOKEN ------------------
+const verifyEmail = async (req, res) => {
+  const { access_token } = req.query; // Supabase sends this token in the confirmation link
+
+  if (!access_token) return res.status(400).json({ error: "Missing access token" });
+
+  try {
+    // Exchange the access_token for a session
+    const { data, error } = await supabase.auth.getSessionFromUrl({
+      url: `${process.env.FRONTEND_URL}/verify?access_token=${access_token}`,
+    });
+
+    if (error) return res.status(400).json({ error: error.message });
+    if (!data?.session) return res.status(401).json({ error: "Invalid or expired token" });
+
+    // ✅ Return session info to frontend
+    res.json({
+      message: "Email verified successfully!",
+      access_token: data.session.access_token,
+      user: data.session.user,
+    });
+  } catch (err) {
+    console.error("Email verification error:", err);
+    res.status(500).json({ error: "Server error", details: err.message });
+  }
+};
 
 
 // ------------------ PASSWORD RESET ------------------
@@ -136,38 +161,19 @@ const updatePassword = async (req, res) => {
 // ------------------ COMPLETE PROFILE AFTER VERIFICATION ------------------
 const completeProfile = async (req, res) => {
   const { name, phone } = req.body;
-  if (!name || !phone) {
-    return res.status(400).json({ error: "Missing name or phone" });
-  }
+  if (!name || !phone) return res.status(400).json({ error: "Missing name or phone" });
+
+  const user = req.user;
+  if (!user) return res.status(401).json({ error: "Unauthorized" });
 
   try {
-    // Fetch all users
-    const { data, error } = await supabase.auth.admin.listUsers();
-    if (error) return res.status(400).json({ error: error.message });
-
-    const users = data?.users || [];
-    if (users.length === 0) {
-      return res.status(400).json({ error: "No users found in Auth" });
-    }
-
-    // ✅ Find latest user by created_at timestamp
-    const latestUser = users.reduce((latest, user) => {
-      return new Date(user.created_at) > new Date(latest.created_at)
-        ? user
-        : latest;
-    }, users[0]);
-
-    if (!latestUser) {
-      return res.status(400).json({ error: "Latest user not found" });
-    }
-
     // Insert into profiles
     const { data: profileData, error: profileError } = await supabase
       .from("profiles")
       .insert([
         {
-          auth_id: latestUser.id,
-          email: latestUser.email,
+          auth_id: user.id,
+          email: user.email,
           name,
           phone,
         },
@@ -175,14 +181,13 @@ const completeProfile = async (req, res) => {
       .select()
       .single();
 
-    if (profileError) {
-      return res.status(400).json({ error: profileError.message });
-    }
+    if (profileError) return res.status(400).json({ error: profileError.message });
 
     res.json({
       message: "Profile created successfully!",
       profile: profileData,
     });
+
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -194,4 +199,5 @@ module.exports = {
   requestPasswordReset,
   updatePassword,
   completeProfile,
+  verifyEmail,
 };

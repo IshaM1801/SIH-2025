@@ -1,6 +1,50 @@
 const supabase = require('../supabase');
-const axios = require("axios"); // ✅ for API call
-//
+
+
+const axios = require("axios");
+
+const fetchAndSendLocation = async (req, res) => {
+  try {
+    let { latitude, longitude } = req.body; // frontend can send coords
+
+    // If frontend didn’t send coords, use IP fallback
+    if (!latitude || !longitude) {
+      let clientIp = req.headers["x-forwarded-for"]?.split(",")[0] || req.socket?.remoteAddress;
+
+      // Localhost fallback
+      if (!clientIp || clientIp === "::1" || clientIp === "127.0.0.1") {
+        clientIp = "8.8.8.8"; // fallback public IP
+      }
+
+      const apiKey = process.env.IPGEO_API_KEY;
+      const geoResponse = await axios.get(
+        `https://api.ipgeolocation.io/v2/ipgeo?apiKey=${apiKey}&ip=${clientIp}&fields=geo,latitude,longitude`
+      );
+
+      latitude = geoResponse.data?.latitude;
+      longitude = geoResponse.data?.longitude;
+    }
+
+    // Reverse geocode with OpenCage
+    const openCageKey = "ceefcaa44fd14d259322d6c1000b06c3";
+    const geoCodeRes = await axios.get(
+      `https://api.opencagedata.com/geocode/v1/json?q=${latitude}+${longitude}&key=${openCageKey}&no_annotations=1`
+    );
+
+    let formattedAddress = "Address not found";
+    if (geoCodeRes.data?.results?.length > 0) {
+      const c = geoCodeRes.data.results[0].components;
+      formattedAddress = `${c.suburb || c.neighbourhood || c.village || ""}, ${c.city || c.town || c.village || ""}, ${c.state || ""}`;
+    }
+
+    res.status(200).json({ latitude, longitude, address: formattedAddress });
+  } catch (err) {
+    console.error("fetchAndSendLocation error:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+module.exports = fetchAndSendLocation;
 // 1️⃣ Fetch all issues
 const getAllIssues = async (req, res) => {
   try {
@@ -50,19 +94,18 @@ const getUserIssues = async (req, res) => {
 };
 
 const { createClient } = require("@supabase/supabase-js");
-
 const createIssue = async (req, res) => {
   try {
-    const { issue_title, issue_description, department, latitude, longitude } = req.body;
+    const { issue_title, issue_description, department } = req.body;
     const user = req.user;
     const created_by = user.id;
 
-    if (!issue_title || !issue_description || !latitude || !longitude) {
-      return res.status(400).json({ error: "Missing required fields or coordinates" });
+    if (!issue_title || !issue_description) {
+      return res.status(400).json({ error: "Missing required fields" });
     }
 
-    // Handle uploaded file
     let imageUrl = null;
+
     if (req.file) {
       const file = req.file;
       const fileExt = file.originalname.split(".").pop();
@@ -78,20 +121,11 @@ const createIssue = async (req, res) => {
 
       if (uploadError) throw uploadError;
 
-      const { data: publicData } = supabase.storage.from("issue-photos").getPublicUrl(fileName);
-      imageUrl = publicData.publicUrl;
-    }
+      const { data: publicData } = supabase.storage
+        .from("issue-photos")
+        .getPublicUrl(fileName);
 
-    // Optional: Reverse geocode using OpenCage to get locality
-    let locality = null;
-    try {
-      const geoRes = await axios.get("https://api.opencagedata.com/geocode/v1/json", {
-        params: { q: `${latitude},${longitude}`, key: "ceefcaa44fd14d259322d6c1000b06c3", no_annotations: 1 },
-      });
-      const result = geoRes.data.results[0];
-      locality = result?.components?.suburb || result?.components?.neighbourhood || result?.components?.city || result?.formatted || null;
-    } catch (err) {
-      console.warn("OpenCage reverse geocode failed:", err.message);
+      imageUrl = publicData.publicUrl;
     }
 
     const { data, error } = await supabase
@@ -103,10 +137,6 @@ const createIssue = async (req, res) => {
           created_by,
           department: department || null,
           image_url: imageUrl,
-          latitude,
-          longitude,
-          address_component: locality,
-          location: `SRID=4326;POINT(${longitude} ${latitude})`,
         },
       ])
       .select()
@@ -121,6 +151,7 @@ const createIssue = async (req, res) => {
   }
 };
 
+module.exports = { createIssue };
 //  Fetch issues only of the logged-in user's department
 // Fetch issues only of the logged-in user's department
 const getDeptIssues = async (req, res) => {
@@ -230,4 +261,5 @@ module.exports = {
   getDeptIssues,
   updateIssueStatus,
   classifyReport,
+  fetchAndSendLocation,
 };

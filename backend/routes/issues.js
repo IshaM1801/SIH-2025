@@ -14,6 +14,7 @@ const {
   classifyReport,
   getDeptIssues,
   updateIssueStatus,
+  fetchAndSendLocation,
 } = require('../controllers/issuesController');
 
 // Routes
@@ -23,6 +24,7 @@ router.post('/create', authMiddleware, upload.single("photo"), createIssue);
 router.get('/dept', authMiddleware, getDeptIssues);
 router.patch('/update-status/:issueId', authMiddleware, updateIssueStatus);
 router.post("/classify-report", authMiddleware, classifyReport);
+router.post("/fetch-location", authMiddleware, fetchAndSendLocation);
 
 //
 module.exports = router;

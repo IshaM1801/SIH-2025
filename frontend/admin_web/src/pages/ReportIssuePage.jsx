@@ -40,52 +40,47 @@ function ReportIssuePage() {
   // Department options
 
   // Reverse geocoding function
-  const reverseGeocode = async (lat, lng) => {
-    setAddressLoading(true);
-    try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
-        {
-          headers: {
-            'User-Agent': 'FixMyCity-App'
-          }
-        }
-      );
-      
-      const data = await response.json();
-      
-      if (data && data.address) {
-        // Extract relevant address components
-        const addressComponents = data.address;
-        const locality = addressComponents.suburb || 
-                        addressComponents.neighbourhood || 
-                        addressComponents.residential ||
-                        addressComponents.quarter ||
-                        addressComponents.city_district;
-        
-        const city = addressComponents.city || 
-                    addressComponents.town || 
-                    addressComponents.village;
-        
-        const state = addressComponents.state;
-        
-        // Format address
-        let formattedAddress = "";
-        if (locality) formattedAddress += locality;
-        if (city) formattedAddress += (formattedAddress ? ", " : "") + city;
-        if (state) formattedAddress += (formattedAddress ? ", " : "") + state;
-        
-        setAddress(formattedAddress || data.display_name);
-      } else {
-        setAddress("Address not found");
-      }
-    } catch (error) {
-      console.error("Reverse geocoding error:", error);
-      setAddress("Unable to fetch address");
-    } finally {
-      setAddressLoading(false);
+  // Reverse geocoding function using OpenCage
+const reverseGeocode = async (lat, lng) => {
+  setAddressLoading(true);
+  try {
+    const response = await fetch(
+      `https://api.opencagedata.com/geocode/v1/json?q=${lat}+${lng}&key=ceefcaa44fd14d259322d6c1000b06c3&no_annotations=1`,
+    );
+
+    const data = await response.json();
+
+    if (data && data.results && data.results.length > 0) {
+      const components = data.results[0].components;
+
+      // Extract relevant address components
+      const locality =
+        components.suburb ||
+        components.neighbourhood ||
+        components.village ||
+        components.town;
+
+      const city = components.city || components.town || components.village;
+
+      const state = components.state;
+
+      // Format address
+      let formattedAddress = "";
+      if (locality) formattedAddress += locality;
+      if (city) formattedAddress += (formattedAddress ? ", " : "") + city;
+      if (state) formattedAddress += (formattedAddress ? ", " : "") + state;
+
+      setAddress(formattedAddress || data.results[0].formatted);
+    } else {
+      setAddress("Address not found");
     }
-  };
+  } catch (error) {
+    console.error("OpenCage reverse geocoding error:", error);
+    setAddress("Unable to fetch address");
+  } finally {
+    setAddressLoading(false);
+  }
+};
   
 
   useEffect(() => {

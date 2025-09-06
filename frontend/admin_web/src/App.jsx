@@ -22,51 +22,56 @@ function UserProtectedRoute({ children }) {
 
 function App() {
   return (
-    <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route path="/verify" element={<VerificationPage />} />
-      <Route path="/my-reports" element={<UserReports />} />
-      <Route path="/my-account" element={<UserAccount />} />
-
-      {/* Map Page */}
-      <Route path="/map" element={<Map />} />
-
-      {/* Example: Directly render GoogleMap if needed */}
-      {/* <Route path="/map" element={<GoogleMap apiKey="AIzaSyDY1WtigL_IKhcEjFRMwH9a4jcf7zPKY_A" />} /> */}
-
-      {/* Protected Routes */}
-      <Route
-        path="/dashboard"
-        element={
+    <>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/verify" element={<VerificationPage/>} />
+        <Route path="/verify" element={<VerificationPage/>} />
+        
+        {/* Protected Routes */}
+        <Route path="/dashboard" element={
           <AdminProtectedRoute>
             <Dashboard />
           </AdminProtectedRoute>
-        }
-      />
+        } />
 
-      <Route
-        path="/issues"
-        element={
+        <Route path="/map" element={
+          <AdminProtectedRoute>
+            <Map/>
+          </AdminProtectedRoute>
+        } />
+        
+        <Route path="/issues" element={
           <UserProtectedRoute>
             <IssuesPage />
           </UserProtectedRoute>
-        }
-      />
+        } />
 
-      <Route
-        path="/report-issue"
-        element={
+        <Route path="/my-reports" element={
+          <UserProtectedRoute>
+            <UserReports/>
+          </UserProtectedRoute>
+        } />
+
+        <Route path="/my-account" element={
+          <UserProtectedRoute>
+            <UserAccount/>
+          </UserProtectedRoute>
+        } />
+        
+        <Route path="/report-issue" element={
           <UserProtectedRoute>
             <ReportIssuePage />
           </UserProtectedRoute>
         }
-      />
+        />
 
-      {/* Default redirects */}
-      <Route path="/" element={<Navigate to="/issues" replace />} />
-      <Route path="*" element={<Navigate to="/login" replace />} />
-    </Routes>
+        {/* Default redirects */}
+        <Route path="/" element={<Navigate to="/issues" replace />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    </>
   );
 }
 
-export default App;
+export default App

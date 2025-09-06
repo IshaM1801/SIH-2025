@@ -3,17 +3,25 @@ const supabase = require('../supabase');
 
 const axios = require("axios");
 
-const fetchAndSendLocation = async (req, res) => {
+const createIssueWithLocation = async (req, res) => {
   try {
-    let { latitude, longitude } = req.body; // frontend can send coords
+    const { issue_title, issue_description, department, latitude, longitude } = req.body;
+    const user = req.user;
+    const created_by = user.id;
 
-    // If frontend didn’t send coords, use IP fallback
-    if (!latitude || !longitude) {
+    if (!issue_title || !issue_description) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    // 1️⃣ Handle coordinates
+    let lat = latitude;
+    let lng = longitude;
+
+    if (!lat || !lng) {
       let clientIp = req.headers["x-forwarded-for"]?.split(",")[0] || req.socket?.remoteAddress;
 
-      // Localhost fallback
       if (!clientIp || clientIp === "::1" || clientIp === "127.0.0.1") {
-        clientIp = "8.8.8.8"; // fallback public IP
+        clientIp = "8.8.8.8";
       }
 
       const apiKey = process.env.IPGEO_API_KEY;
@@ -21,14 +29,14 @@ const fetchAndSendLocation = async (req, res) => {
         `https://api.ipgeolocation.io/v2/ipgeo?apiKey=${apiKey}&ip=${clientIp}&fields=geo,latitude,longitude`
       );
 
-      latitude = geoResponse.data?.latitude;
-      longitude = geoResponse.data?.longitude;
+      lat = geoResponse.data?.latitude;
+      lng = geoResponse.data?.longitude;
     }
 
     // Reverse geocode with OpenCage
     const openCageKey = "ceefcaa44fd14d259322d6c1000b06c3";
     const geoCodeRes = await axios.get(
-      `https://api.opencagedata.com/geocode/v1/json?q=${latitude}+${longitude}&key=${openCageKey}&no_annotations=1`
+      `https://api.opencagedata.com/geocode/v1/json?q=${lat}+${lng}&key=${openCageKey}&no_annotations=1`
     );
 
     let formattedAddress = "Address not found";
@@ -37,14 +45,62 @@ const fetchAndSendLocation = async (req, res) => {
       formattedAddress = `${c.suburb || c.neighbourhood || c.village || ""}, ${c.city || c.town || c.village || ""}, ${c.state || ""}`;
     }
 
-    res.status(200).json({ latitude, longitude, address: formattedAddress });
+    // 2️⃣ Handle image upload
+    let imageUrl = null;
+    if (req.file) {
+      const file = req.file;
+      const fileExt = file.originalname.split(".").pop();
+      const fileName = `issues/${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("issue-photos")
+        .upload(fileName, file.buffer, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType: file.mimetype,
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: publicData } = supabase.storage
+        .from("issue-photos")
+        .getPublicUrl(fileName);
+
+      imageUrl = publicData.publicUrl;
+    }
+
+    // 3️⃣ Insert issue into Supabase
+    const { data, error } = await supabase
+      .from("issues")
+      .insert([
+        {
+          issue_title,
+          issue_description,
+          created_by,
+          department: department || null,
+          image_url: imageUrl,
+          latitude: lat,
+          longitude: lng,
+          address_component: formattedAddress,
+        },
+      ])
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.status(201).json({
+      message: "Issue created successfully",
+      issue: data,
+      location: { latitude: lat, longitude: lng, address_component: formattedAddress },
+    });
   } catch (err) {
-    console.error("fetchAndSendLocation error:", err);
+    console.error("createIssueWithLocation error:", err);
     res.status(500).json({ error: err.message });
   }
 };
 
-module.exports = fetchAndSendLocation;
+
 // 1️⃣ Fetch all issues
 const getAllIssues = async (req, res) => {
   try {
@@ -94,64 +150,7 @@ const getUserIssues = async (req, res) => {
 };
 
 const { createClient } = require("@supabase/supabase-js");
-const createIssue = async (req, res) => {
-  try {
-    const { issue_title, issue_description, department } = req.body;
-    const user = req.user;
-    const created_by = user.id;
 
-    if (!issue_title || !issue_description) {
-      return res.status(400).json({ error: "Missing required fields" });
-    }
-
-    let imageUrl = null;
-
-    if (req.file) {
-      const file = req.file;
-      const fileExt = file.originalname.split(".").pop();
-      const fileName = `issues/${Date.now()}.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("issue-photos")
-        .upload(fileName, file.buffer, {
-          cacheControl: "3600",
-          upsert: false,
-          contentType: file.mimetype,
-        });
-
-      if (uploadError) throw uploadError;
-
-      const { data: publicData } = supabase.storage
-        .from("issue-photos")
-        .getPublicUrl(fileName);
-
-      imageUrl = publicData.publicUrl;
-    }
-
-    const { data, error } = await supabase
-      .from("issues")
-      .insert([
-        {
-          issue_title,
-          issue_description,
-          created_by,
-          department: department || null,
-          image_url: imageUrl,
-        },
-      ])
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    res.status(201).json({ message: "Issue created successfully", issue: data });
-  } catch (err) {
-    console.error("createIssue error:", err);
-    res.status(500).json({ error: err.message });
-  }
-};
-
-module.exports = { createIssue };
 //  Fetch issues only of the logged-in user's department
 // Fetch issues only of the logged-in user's department
 const getDeptIssues = async (req, res) => {
@@ -257,9 +256,9 @@ const classifyReport = async (req, res) => {
 module.exports = {
   getAllIssues,
   getUserIssues,
-  createIssue,
+  
   getDeptIssues,
   updateIssueStatus,
   classifyReport,
-  fetchAndSendLocation,
+  createIssueWithLocation,
 };

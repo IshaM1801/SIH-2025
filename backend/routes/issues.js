@@ -10,21 +10,19 @@ const upload = multer({ storage });
 const {
   getAllIssues,
   getUserIssues,
-  createIssue,
+ 
   classifyReport,
   getDeptIssues,
   updateIssueStatus,
-  fetchAndSendLocation,
-} = require('../controllers/issuesController');
+createIssueWithLocation,} = require('../controllers/issuesController');
 
 // Routes
 router.get('/', authMiddleware, getAllIssues);
 router.get('/user/:userId', authMiddleware, getUserIssues);
-router.post('/create', authMiddleware, upload.single("photo"), createIssue);
+router.post('/create', authMiddleware, upload.single("photo"), createIssueWithLocation);
 router.get('/dept', authMiddleware, getDeptIssues);
 router.patch('/update-status/:issueId', authMiddleware, updateIssueStatus);
 router.post("/classify-report", authMiddleware, classifyReport);
-router.post("/fetch-location", authMiddleware, fetchAndSendLocation);
 
 //
 module.exports = router;

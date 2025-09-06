@@ -24,19 +24,13 @@ function ReportIssuePage() {
           console.log("Fetched coordinates:", latitude, longitude);
   
           // Save in state and localStorage
-          setCoordinates({ latitude, longitude });
-          localStorage.setItem("coords", JSON.stringify({ latitude, longitude }));
+          const coords = { latitude, longitude }; // ✅ define coords here
+          setCoordinates(coords);
+          localStorage.setItem("coords", JSON.stringify(coords));
           console.log("Coordinates saved in localStorage:", JSON.parse(localStorage.getItem("coords")));
   
           // Send to backend
-          fetch("http://localhost:5001/issues/fetch-location", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ latitude, longitude }),
-          })
-            .then((res) => res.json())
-            .then((data) => console.log("Server response:", data))
-            .catch((err) => console.error("Fetch error:", err));
+          
         },
         (err) => {
           console.warn("Geolocation error:", err.message);
@@ -92,32 +86,31 @@ function ReportIssuePage() {
     setSelectedImage(null);
     setImagePreview(null);
   };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError("");
     setSuccess("");
-
+  
     if (!formData.issue_title || !formData.issue_description) {
       setError("All fields are required");
       setLoading(false);
       return;
     }
-
+  
     try {
       const token = localStorage.getItem("token");
       const user = JSON.parse(localStorage.getItem("user") || "{}");
-
+  
       if (!token || !user?.id) {
         setError("User is not logged in or token not found");
         setLoading(false);
         return;
       }
-
+  
       // Use coordinates from localStorage if available
       const storedCoords = JSON.parse(localStorage.getItem("coords") || "{}");
-
+  
       const payload = new FormData();
       payload.append("issue_title", formData.issue_title);
       payload.append("issue_description", formData.issue_description);
@@ -127,17 +120,18 @@ function ReportIssuePage() {
         payload.append("latitude", storedCoords.latitude);
         payload.append("longitude", storedCoords.longitude);
       }
-
+  
+      // Send everything to merged /create endpoint
       const response = await fetch("http://localhost:5001/issues/create", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
         body: payload,
       });
-
+  
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Issue submission failed");
-
-      // Call classify-report
+  
+      // Keep classify-report call as before
       const classifyRes = await fetch("http://localhost:5001/issues/classify-report", {
         method: "POST",
         headers: {
@@ -146,12 +140,12 @@ function ReportIssuePage() {
         },
         body: JSON.stringify({ reportId: data.issue.issue_id }),
       });
-
+  
       const classifyData = await classifyRes.json();
       if (!classifyRes.ok) throw new Error(classifyData.error || "Classification failed");
-
+  
       setSuccess(`Your report has been submitted to the ${classifyData.department} department.`);
-
+  
       // Reset form
       setFormData({ issue_title: "", issue_description: "" });
       setSelectedImage(null);

@@ -1,7 +1,33 @@
-const supabase = require('../supabase');
+const supabase = require("../supabase");
 const axios = require("axios");
 const { sendWhatsAppMessage } = require("../services/whatsappService");
 
+
+ const fetchAddress = async (req, res) => {
+  try {
+    const { latitude, longitude } = req.body;
+
+    if (!latitude || !longitude) {
+      return res.status(400).json({ error: "Latitude and longitude are required" });
+    }
+
+    const openCageKey = "ceefcaa44fd14d259322d6c1000b06c3";
+    const geoCodeRes = await axios.get(
+      `https://api.opencagedata.com/geocode/v1/json?q=${latitude}+${longitude}&key=${openCageKey}&no_annotations=1`
+    );
+
+    let formattedAddress = "Address not found";
+    if (geoCodeRes.data?.results?.length > 0) {
+      const c = geoCodeRes.data.results[0].components;
+      formattedAddress = `${c.suburb || c.neighbourhood || c.village || ""}, ${c.city || c.town || c.village || ""}, ${c.state || ""}`;
+    }
+
+    res.json({ address: formattedAddress });
+  } catch (err) {
+    console.error("Error in fetchAddress:", err.message);
+    res.status(500).json({ error: "Failed to fetch address" });
+  }
+};
 const createIssueWithLocation = async (req, res) => {
   try {
     const { issue_title, issue_description, department, latitude, longitude } = req.body;
@@ -33,16 +59,7 @@ const createIssueWithLocation = async (req, res) => {
     }
 
     // Reverse geocode with OpenCage
-    const openCageKey = "ceefcaa44fd14d259322d6c1000b06c3";
-    const geoCodeRes = await axios.get(
-      `https://api.opencagedata.com/geocode/v1/json?q=${lat}+${lng}&key=${openCageKey}&no_annotations=1`
-    );
-
-    let formattedAddress = "Address not found";
-    if (geoCodeRes.data?.results?.length > 0) {
-      const c = geoCodeRes.data.results[0].components;
-      formattedAddress = `${c.suburb || c.neighbourhood || c.village || ""}, ${c.city || c.town || c.village || ""}, ${c.state || ""}`;
-    }
+    
 
     // 2️⃣ Handle image upload
     let imageUrl = null;
@@ -289,4 +306,5 @@ module.exports = {
   updateIssueStatus,
   classifyReport,
   createIssueWithLocation,
+  fetchAddress,
 };

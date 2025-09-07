@@ -107,7 +107,59 @@ async function listReports(req, res) {
   }
 }
 
+// Get profile details from profiles table
+async function getProfileDetails(req, res) {
+  try {
+    const userId = req.params.userId || req.user.id;
+    
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('auth_id', userId)
+      .single();
+
+    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
+      throw error;
+    }
+
+    res.json({ profile: profile || null });
+  } catch (err) {
+    console.error('Error fetching profile details:', err);
+    res.status(500).json({ error: err.message });
+  }
+}
+
+// Update profile
+async function updateProfile(req, res) {
+  try {
+    const userId = req.user.id;
+    const { name, phone } = req.body;
+
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .upsert({
+        auth_id: userId,
+        name,
+        phone,
+        email: req.user.email,
+        updated_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.json({ 
+      message: 'Profile updated successfully',
+      profile 
+    });
+  } catch (err) {
+    console.error('Error updating profile:', err);
+    res.status(500).json({ error: err.message });
+  }
+}
 
 
-module.exports = { getProfile, createReport, listReports };
+
+module.exports = { getProfile, createReport, listReports, getProfileDetails, updateProfile };
 //

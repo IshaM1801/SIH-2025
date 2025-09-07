@@ -38,9 +38,6 @@ function App() {
         {/* --- Public Routes --- */}
         <Route path="/login" element={<Login />} />
         <Route path="/verify" element={<VerificationPage />} />
-        <Route path="/my-reports" element={<UserReports />} />
-        <Route path="/my-account" element={<UserAccount />} />
-        <Route path="/map" element={<Map />} />
 
         {/* --- Protected Admin Routes --- */}
         <Route element={<Layout />}>
@@ -49,6 +46,14 @@ function App() {
             element={
               <AdminProtectedRoute>
                 <Analytics />
+              </AdminProtectedRoute>
+            }
+          />
+          <Route
+            path="/map"
+            element={
+              <AdminProtectedRoute>
+                <Map />
               </AdminProtectedRoute>
             }
           />
@@ -132,6 +137,30 @@ function App() {
           element={
             <UserProtectedRoute>
               <ReportIssuePage />
+            </UserProtectedRoute>
+          }
+        />
+        <Route
+          path="/my-reports"
+          element={
+            <UserProtectedRoute>
+              <UserReports />
+            </UserProtectedRoute>
+          }
+        />
+        <Route
+          path="/my-account"
+          element={
+            <UserProtectedRoute>
+              <UserAccount />
+            </UserProtectedRoute>
+          }
+        />
+        <Route
+          path="/certificates"
+          element={
+            <UserProtectedRoute>
+              <CertificatesPage />
             </UserProtectedRoute>
           }
         />

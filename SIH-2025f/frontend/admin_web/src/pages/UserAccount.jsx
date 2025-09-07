@@ -19,12 +19,17 @@ import {
   Bell,
   Shield,
   FileText,
-  LogOut
+  LogOut,
+  Loader2,
+  CheckCircle,
+  Clock,
+  RefreshCw
 } from "lucide-react";
 
 function UserAccount() {
   const navigate = useNavigate();
   const [userData, setUserData] = useState(null);
+  const [profileData, setProfileData] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editedData, setEditedData] = useState({
     name: "",
@@ -32,9 +37,143 @@ function UserAccount() {
     email: ""
   });
   const [loading, setLoading] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(true);
   const [message, setMessage] = useState("");
+  
+  // ✅ Add state for reports data
+  const [reports, setReports] = useState([]);
+  const [reportsLoading, setReportsLoading] = useState(true);
 
-  // Get user data from localStorage
+  // ✅ Fetch user reports for statistics
+  const fetchUserReports = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        setReportsLoading(false);
+        return;
+      }
+
+      const response = await fetch("http://localhost:5001/user/my-reports", {
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const processed = (Array.isArray(data) ? data : data.reports || []);
+        setReports(processed);
+        console.log("Fetched reports for stats:", processed);
+      } else {
+        console.error("Failed to fetch reports:", response.status);
+      }
+    } catch (error) {
+      console.error("Error fetching reports:", error);
+    } finally {
+      setReportsLoading(false);
+    }
+  };
+
+  // ✅ Calculate real statistics from reports data
+  const getAccountStats = () => {
+    if (reportsLoading || !reports.length) {
+      return {
+        totalReports: 0,
+        resolvedReports: 0,
+        pendingReports: 0,
+        inProgressReports: 0
+      };
+    }
+
+    const total = reports.length;
+    const resolved = reports.filter(r => 
+      r.status?.toLowerCase() === 'resolved' || 
+      r.status?.toLowerCase() === 'completed'
+    ).length;
+    const pending = reports.filter(r => 
+      r.status?.toLowerCase() === 'pending' || 
+      r.status?.toLowerCase() === 'submitted'
+    ).length;
+    const inProgress = reports.filter(r => 
+      r.status?.toLowerCase() === 'in_progress' || 
+      r.status?.toLowerCase() === 'in progress' ||
+      r.status?.toLowerCase() === 'assigned'
+    ).length;
+
+    return {
+      totalReports: total,
+      resolvedReports: resolved,
+      pendingReports: pending,
+      inProgressReports: inProgress
+    };
+  };
+
+  const accountStats = getAccountStats();
+
+  // ✅ Fetch profile data from database
+  const fetchProfileData = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        console.warn("No token found");
+        setProfileLoading(false);
+        return;
+      }
+
+      const response = await fetch("http://localhost:5001/user/profile", {
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log("Profile data from DB:", data);
+        
+        // The profile endpoint returns the user object from Supabase
+        // We need to fetch the profile from the profiles table separately
+        await fetchUserProfile(data.user.id);
+      } else {
+        console.error("Failed to fetch profile:", response.status);
+      }
+    } catch (error) {
+      console.error("Error fetching profile:", error);
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
+  // ✅ Fetch user profile from profiles table
+  const fetchUserProfile = async (userId) => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`http://localhost:5001/user/profile-details/${userId}`, {
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        }
+      });
+
+      if (response.ok) {
+        const profileData = await response.json();
+        console.log("Profile details:", profileData);
+        setProfileData(profileData.profile);
+        
+        // Update editedData with database values
+        setEditedData(prev => ({
+          ...prev,
+          name: profileData.profile?.name || prev.name,
+          phone: profileData.profile?.phone || "",
+        }));
+      }
+    } catch (error) {
+      console.error("Error fetching profile details:", error);
+    }
+  };
+
+  // Get user data from localStorage and fetch profile from DB
   useEffect(() => {
     const storedUserData = localStorage.getItem("user");
     if (storedUserData) {
@@ -42,15 +181,25 @@ function UserAccount() {
         const parsedData = JSON.parse(storedUserData);
         setUserData(parsedData);
         
-        // Initialize edited data
+        // Initialize edited data with localStorage values first
         setEditedData({
           name: parsedData?.profile?.name || getUserNameFromEmail(parsedData),
           phone: parsedData?.profile?.phone || "",
           email: parsedData?.user_metadata?.email || parsedData?.email || ""
         });
+        
+        // ✅ Fetch fresh data from database
+        fetchProfileData();
+        // ✅ Fetch reports for statistics
+        fetchUserReports();
       } catch (error) {
         console.error("Error parsing user data:", error);
+        setProfileLoading(false);
+        setReportsLoading(false);
       }
+    } else {
+      setProfileLoading(false);
+      setReportsLoading(false);
     }
   }, []);
 
@@ -69,6 +218,10 @@ function UserAccount() {
   };
 
   const getUserName = () => {
+    // ✅ Prioritize database data over localStorage
+    if (profileData?.name) {
+      return profileData.name;
+    }
     if (userData?.profile?.name) {
       return userData.profile.name;
     }
@@ -100,18 +253,44 @@ function UserAccount() {
     setEditedData(prev => ({ ...prev, [field]: value }));
   };
 
+  // ✅ Update the save function to actually save to database
   const handleSave = async () => {
     setLoading(true);
     setMessage("");
 
     try {
-      // Here you would make an API call to update the user profile
-      // For now, we'll simulate the update
+      const token = localStorage.getItem("token");
+      if (!token) {
+        throw new Error("No authentication token found");
+      }
+
+      // Call your profile update API endpoint
+      const response = await fetch("http://localhost:5001/user/update-profile", {
+        method: "PATCH",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          name: editedData.name,
+          phone: editedData.phone
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update profile");
+      }
+
+      const updatedProfile = await response.json();
       
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Update local state
+      setProfileData(prev => ({
+        ...prev,
+        name: editedData.name,
+        phone: editedData.phone
+      }));
       
-      // Update local storage with new data
+      // Update localStorage as well for consistency
       const updatedUserData = {
         ...userData,
         profile: {
@@ -123,6 +302,7 @@ function UserAccount() {
       
       localStorage.setItem("user", JSON.stringify(updatedUserData));
       setUserData(updatedUserData);
+      
       setIsEditing(false);
       setMessage("✅ Profile updated successfully!");
       
@@ -139,8 +319,8 @@ function UserAccount() {
 
   const handleCancel = () => {
     setEditedData({
-      name: userData?.profile?.name || getUserNameFromEmail(userData),
-      phone: userData?.profile?.phone || "",
+      name: profileData?.name || userData?.profile?.name || getUserNameFromEmail(userData),
+      phone: profileData?.phone || userData?.profile?.phone || "",
       email: userData?.user_metadata?.email || userData?.email || ""
     });
     setIsEditing(false);
@@ -153,12 +333,22 @@ function UserAccount() {
     navigate("/login");
   };
 
-  if (!userData) {
+  // ✅ Refresh reports function
+  const handleRefreshStats = async () => {
+    setReportsLoading(true);
+    await fetchUserReports();
+  };
+
+  // ✅ Show loading state while fetching profile
+  if (!userData || profileLoading) {
     return (
       <PWALayout title="My Account" showNotifications={false}>
         <div className="px-4 pb-6">
           <div className="flex items-center justify-center h-64">
-            <div className="text-gray-500">Loading account information...</div>
+            <div className="text-center">
+              <Loader2 className="w-8 h-8 text-gray-400 mx-auto mb-3 animate-spin" />
+              <div className="text-gray-500">Loading account information...</div>
+            </div>
           </div>
         </div>
       </PWALayout>
@@ -279,6 +469,10 @@ function UserAccount() {
                     <span className="text-gray-900">
                       {editedData.phone || "Not provided"}
                     </span>
+                    {/* ✅ Show data source indicator */}
+                    {profileData?.phone && (
+                      <Badge variant="outline" className="text-xs">From DB</Badge>
+                    )}
                   </div>
                 )}
               </div>
@@ -291,8 +485,17 @@ function UserAccount() {
                   disabled={loading}
                   className="flex-1"
                 >
-                  <Save className="w-4 h-4 mr-2" />
-                  {loading ? "Saving..." : "Save Changes"}
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 mr-2" />
+                      Save Changes
+                    </>
+                  )}
                 </Button>
                 <Button 
                   variant="outline" 
@@ -318,7 +521,7 @@ function UserAccount() {
             <Button 
               variant="outline" 
               className="w-full justify-start h-12"
-              onClick={() => navigate("/my-issues")}
+              onClick={() => navigate("/my-reports")}
             >
               <FileText className="w-5 h-5 mr-3" />
               View My Reports
@@ -355,23 +558,102 @@ function UserAccount() {
           </CardContent>
         </Card>
 
-        {/* Account Stats Card */}
+        {/* ✅ Enhanced Account Stats Card with Real Data */}
         <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="text-lg">Account Statistics</CardTitle>
-            <CardDescription>Your activity summary</CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <div>
+              <CardTitle className="text-lg">Account Statistics</CardTitle>
+              <CardDescription>Your civic engagement activity</CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefreshStats}
+              disabled={reportsLoading}
+              className="h-8"
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 ${reportsLoading ? 'animate-spin' : ''}`} />
+              {reportsLoading ? 'Loading...' : 'Refresh'}
+            </Button>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="text-center p-4 bg-blue-50 rounded-lg">
-                <div className="text-2xl font-bold text-blue-600">12</div>
-                <div className="text-sm text-gray-600">Total Reports</div>
+            {reportsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 text-gray-400 animate-spin mr-3" />
+                <span className="text-gray-500">Loading statistics...</span>
               </div>
-              <div className="text-center p-4 bg-green-50 rounded-lg">
-                <div className="text-2xl font-bold text-green-600">8</div>
-                <div className="text-sm text-gray-600">Resolved Issues</div>
-              </div>
-            </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-100">
+                    <div className="flex items-center justify-center mb-2">
+                      <FileText className="w-5 h-5 text-blue-600 mr-2" />
+                    </div>
+                    <div className="text-2xl font-bold text-blue-600">{accountStats.totalReports}</div>
+                    <div className="text-sm text-gray-600">Total Reports</div>
+                  </div>
+                  <div className="text-center p-4 bg-green-50 rounded-lg border border-green-100">
+                    <div className="flex items-center justify-center mb-2">
+                      <CheckCircle className="w-5 h-5 text-green-600 mr-2" />
+                    </div>
+                    <div className="text-2xl font-bold text-green-600">{accountStats.resolvedReports}</div>
+                    <div className="text-sm text-gray-600">Resolved Issues</div>
+                  </div>
+                </div>
+                
+                {/* ✅ Additional stats row */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="text-center p-4 bg-yellow-50 rounded-lg border border-yellow-100">
+                    <div className="flex items-center justify-center mb-2">
+                      <Clock className="w-5 h-5 text-yellow-600 mr-2" />
+                    </div>
+                    <div className="text-2xl font-bold text-yellow-600">{accountStats.pendingReports}</div>
+                    <div className="text-sm text-gray-600">Pending</div>
+                  </div>
+                  <div className="text-center p-4 bg-purple-50 rounded-lg border border-purple-100">
+                    <div className="flex items-center justify-center mb-2">
+                      <RefreshCw className="w-5 h-5 text-purple-600 mr-2" />
+                    </div>
+                    <div className="text-2xl font-bold text-purple-600">{accountStats.inProgressReports}</div>
+                    <div className="text-sm text-gray-600">In Progress</div>
+                  </div>
+                </div>
+
+                {/* ✅ Success rate indicator */}
+                {accountStats.totalReports > 0 && (
+                  <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-600">Success Rate:</span>
+                      <span className="font-semibold text-gray-900">
+                        {Math.round((accountStats.resolvedReports / accountStats.totalReports) * 100)}%
+                      </span>
+                    </div>
+                    <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-green-600 h-2 rounded-full transition-all duration-300" 
+                        style={{ 
+                          width: `${(accountStats.resolvedReports / accountStats.totalReports) * 100}%` 
+                        }}
+                      ></div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ✅ Empty state */}
+                {accountStats.totalReports === 0 && (
+                  <div className="text-center py-6">
+                    <FileText className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                    <p className="text-gray-600 mb-4">No reports submitted yet</p>
+                    <Button 
+                      onClick={() => navigate("/report-issue")} 
+                      size="sm"
+                    >
+                      Submit Your First Report
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
           </CardContent>
         </Card>
 

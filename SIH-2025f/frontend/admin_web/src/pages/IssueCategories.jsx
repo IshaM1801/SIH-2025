@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import IssueDetailModal from "../components/ui/IssueDetailModal1"; // Make sure this component exists
+import IssueDetailModal from "../components/ui/IssueDetailModal"; // Make sure this component exists
 
 // Helper function to create colored status pills
 const StatusPill = ({ status }) => {

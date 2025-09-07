@@ -56,9 +56,15 @@ function AppTopBar({ title = "FixMyCity", showNotifications = true, showSettings
     <header className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm">
       <div className="flex items-center justify-between px-4 py-3">
         <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-            <div className="w-5 h-5 bg-white rounded-sm"></div>
-          </div>
+          <div className="relative">
+    <div className="w-9 h-9 bg-blue-50 rounded-xl flex items-center justify-center shadow-sm border border-blue-100">
+      <img 
+        className="w-7 h-7 rounded-lg object-cover" 
+        src="/FixMyCityLogo.jpeg" 
+        alt="FixMyCity Logo" 
+      />
+    </div>
+  </div>
           <h1 className="text-xl font-bold text-gray-900">{title}</h1>
         </div>
         

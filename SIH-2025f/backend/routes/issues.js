@@ -10,6 +10,7 @@ const upload = multer({ storage });
 const {
   getAllIssues,
   getUserIssues,
+  fetchAddress,
  
   classifyReport,
   getDeptIssues,
@@ -23,6 +24,7 @@ router.post('/create', authMiddleware, upload.single("photo"), createIssueWithLo
 router.get('/dept', authMiddleware, getDeptIssues);
 router.patch('/update-status/:issueId', authMiddleware, updateIssueStatus);
 router.post("/classify-report", authMiddleware, classifyReport);
+router.post("/fetch-address", authMiddleware, fetchAddress);
 
 //
 module.exports = router;

@@ -1,0 +1,11 @@
+pandas
+numpy
+scikit-learn
+joblib
+streamlit
+torch
+torchvision
+pillow 
+twilio
+flask
+dotenv

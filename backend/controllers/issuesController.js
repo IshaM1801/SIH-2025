@@ -1,7 +1,6 @@
 const supabase = require('../supabase');
-
-
 const axios = require("axios");
+const { sendWhatsAppMessage } = require("../services/whatsappService");
 
 const createIssueWithLocation = async (req, res) => {
   try {
@@ -186,24 +185,46 @@ const updateIssueStatus = async (req, res) => {
   const { issueId } = req.params;
   const { status } = req.body;
 
-  if (!status) return res.status(400).json({ error: 'Status is required' });
+  if (!status) return res.status(400).json({ error: "Status is required" });
 
   try {
+    // Update issue status & fetch minimal info
     const { data, error } = await supabase
-      .from('issues')
+      .from("issues")
       .update({ status })
-      .eq('issue_id', issueId)
-      .select()
+      .eq("issue_id", issueId)
+      .select("issue_id, issue_title, created_by")
       .single();
 
     if (error) throw error;
 
-    res.json({ message: 'Status updated successfully', issue: data });
+    // Fetch user profile using created_by (auth_id, not email)
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("name, phone")
+      .eq("auth_id", data.created_by)
+      .single();
+
+    if (profileError) {
+      console.warn("⚠️ Profile fetch failed:", profileError.message);
+    }
+
+    // Send WhatsApp if phone exists
+    if (profile?.phone) {
+      const msg = `Hello ${profile.name},\n\nYour issue *${data.issue_title}* is now marked as *${status}*.\nCheck the app for details.`;
+      await sendWhatsAppMessage(profile.phone, msg);
+    }
+
+    res.json({
+      message: "Status updated & WhatsApp sent successfully",
+      issue: data,
+    });
   } catch (err) {
-    console.error('updateIssueStatus error:', err);
+    console.error("updateIssueStatus error:", err);
     res.status(500).json({ error: err.message });
   }
 };
+
 
 const classifyReport = async (req, res) => {
   try {

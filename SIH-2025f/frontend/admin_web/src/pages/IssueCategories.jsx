@@ -1,7 +1,9 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { Calendar, MoreHorizontal, Plus } from "lucide-react";
 import IssueDetailModal from "../components/ui/IssueDetailModal";
 
+// Status pill component
 const StatusPill = ({ status }) => {
   const statusStyles = {
     pending: "bg-yellow-100 text-yellow-800",
@@ -22,6 +24,7 @@ const StatusPill = ({ status }) => {
   );
 };
 
+// Format relative time
 const formatRelativeTime = (dateString) => {
   const date = new Date(dateString);
   const now = new Date();
@@ -38,12 +41,13 @@ export default function IssueManager() {
   const [isHod, setIsHod] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [selectedIssue, setSelectedIssue] = useState(null);
   const [selectedManager, setSelectedManager] = useState(null);
-  const navigate = useNavigate();
+  const [selectedIssue, setSelectedIssue] = useState(null);
 
+  const navigate = useNavigate();
   const token = localStorage.getItem("employee_token");
 
+  // Fetch employee/HOD data
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
@@ -58,7 +62,7 @@ export default function IssueManager() {
 
       if (!res.ok) {
         if (res.status === 401 || res.status === 403) {
-          setError("Session expired. Please login again.");
+          setError("Session expired. Redirecting to login...");
           setTimeout(() => navigate("/login"), 2000);
           return;
         }
@@ -68,11 +72,11 @@ export default function IssueManager() {
       const data = await res.json();
 
       if (data.issues) {
-        // Employee
+        // Employee view
         setIsHod(false);
         setIssues(data.issues);
       } else if (data.managers) {
-        // HOD
+        // HOD view
         setIsHod(true);
         setManagers(data.managers);
       }
@@ -85,16 +89,14 @@ export default function IssueManager() {
     }
   }, [navigate, token]);
 
-  // Fetch issues for a specific manager (HOD only)
+  // Fetch issues for a selected manager (HOD only)
   const fetchManagerIssues = async (manager) => {
     try {
       setLoading(true);
       setSelectedManager(manager);
       const res = await fetch(
         `http://localhost:5001/issues/dept?manager_email=${manager.emp_email}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -107,12 +109,10 @@ export default function IssueManager() {
     }
   };
 
+  // Update issue status
   const updateStatus = async (issueId, newStatus) => {
     try {
-      if (!token) {
-        setError("Authentication required.");
-        return;
-      }
+      if (!token) return setError("Authentication required.");
       const res = await fetch(
         `http://localhost:5001/issues/update-status/${issueId}`,
         {
@@ -143,98 +143,120 @@ export default function IssueManager() {
   if (loading) return <div className="p-8">Loading data...</div>;
   if (error) return <div className="p-8 text-red-600 font-semibold">{error}</div>;
 
-  return (
-    <>
-      <div className="p-4 md:p-8 bg-gray-50 min-h-screen">
-        <header className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-800">Report Management</h1>
-        </header>
+  // Map issues to Kanban columns
+  const columns = [
+    {
+      id: 1,
+      title: "Pending",
+      color: "bg-yellow-500",
+      tasks: issues.filter(issue => issue.status === "pending"),
+    },
+    {
+      id: 2,
+      title: "In Progress",
+      color: "bg-purple-500",
+      tasks: issues.filter(issue => issue.status === "in_progress"),
+    },
+    {
+      id: 3,
+      title: "Resolved",
+      color: "bg-green-500",
+      tasks: issues.filter(issue => issue.status === "resolved"),
+    },
+    {
+      id: 4,
+      title: "Rejected",
+      color: "bg-red-500",
+      tasks: issues.filter(issue => issue.status === "rejected"),
+    }
+  ];
 
-        {isHod ? (
-          <>
-            {/* HOD Manager Buttons */}
-            <div className="mb-4 flex flex-wrap gap-2">
-              {managers.map((mgr) => (
-                <button
-                  key={mgr.emp_id}
-                  onClick={() => fetchManagerIssues(mgr)}
-                  className={`px-4 py-2 rounded-md text-white font-semibold ${
-                    selectedManager?.emp_id === mgr.emp_id
-                      ? "bg-blue-700"
-                      : "bg-blue-500 hover:bg-blue-600"
-                  }`}
-                >
-                  {mgr.emp_email}
-                </button>
-              ))}
+  // Task card component
+  const TaskCard = ({ task }) => (
+    <div className="bg-white rounded-lg border border-gray-200 p-4 mb-3 shadow-sm hover:shadow-md transition-shadow">
+      <div className="flex justify-between items-start mb-3">
+        <h3 className="text-sm font-medium text-gray-900 leading-tight pr-2">
+          {task.issue_title}
+        </h3>
+      </div>
+
+      <div className="mb-3">
+        <StatusPill status={task.status} />
+      </div>
+
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-3">
+          {task.created_at && (
+            <div className={`flex items-center space-x-1 text-gray-500`}>
+              <Calendar className="w-3 h-3" />
+              <span className="text-xs">{formatRelativeTime(task.created_at)}</span>
             </div>
-
-            {/* Display selected manager issues */}
-            {selectedManager && (
-              <h2 className="mb-2 text-lg font-semibold text-gray-700">
-                Issues for {selectedManager.emp_email}
-              </h2>
-            )}
-          </>
-        ) : null}
-
-        {/* Issues Table (both employee and HOD viewing manager issues) */}
-        <div className="bg-white rounded-lg shadow-md overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="bg-gray-100 border-b border-gray-200">
-              <tr>
-                <th className="p-4 text-sm font-semibold text-gray-600">REPORT ID</th>
-                <th className="p-4 text-sm font-semibold text-gray-600">ISSUE</th>
-                <th className="p-4 text-sm font-semibold text-gray-600">SUBMITTED</th>
-                <th className="p-4 text-sm font-semibold text-gray-600">STATUS</th>
-                <th className="p-4 text-sm font-semibold text-gray-600">ACTIONS</th>
-              </tr>
-            </thead>
-            <tbody>
-              {issues.map((issue) => (
-                <tr key={issue.issue_id} className="border-b border-gray-200 hover:bg-gray-50">
-                  <td className="p-4 text-sm text-gray-500 font-mono">
-                    {`REP-${issue.issue_id.substring(0, 6).toUpperCase()}`}
-                  </td>
-                  <td className="p-4">
-                    <div className="font-semibold text-gray-800">{issue.issue_title}</div>
-                    <div className="text-xs text-gray-500">{issue.address_component || "N/A"}</div>
-                  </td>
-                  <td className="p-4 text-sm text-gray-600">{formatRelativeTime(issue.created_at)}</td>
-                  <td className="p-4"><StatusPill status={issue.status} /></td>
-                  <td className="p-4 flex items-center gap-4">
-                    <button
-                      onClick={() => setSelectedIssue(issue)}
-                      className="text-blue-600 hover:underline font-semibold text-sm"
-                    >
-                      View
-                    </button>
-                    <select
-                      value={issue.status}
-                      onChange={(e) => updateStatus(issue.issue_id, e.target.value)}
-                      className="border rounded-md px-2 py-1 text-sm bg-white"
-                    >
-                      <option value="pending">Pending</option>
-                      <option value="in_progress">In Progress</option>
-                      <option value="resolved">Resolved</option>
-                      <option value="rejected">Rejected</option>
-                    </select>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {issues.length === 0 && (
-            <p className="p-6 text-center text-gray-500">
-              {isHod ? "No issues found for this manager." : "No issues found for your department."}
-            </p>
           )}
+        </div>
+
+        <select
+          value={task.status}
+          onChange={(e) => updateStatus(task.issue_id, e.target.value)}
+          className="border rounded-md px-2 py-1 text-xs bg-white"
+        >
+          <option value="pending">Pending</option>
+          <option value="in_progress">In Progress</option>
+          <option value="resolved">Resolved</option>
+          <option value="rejected">Rejected</option>
+        </select>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-7xl mx-auto">
+        {isHod && (
+          <div className="mb-6 flex flex-wrap gap-2">
+            {managers.map((mgr) => (
+              <button
+                key={mgr.emp_id}
+                onClick={() => fetchManagerIssues(mgr)}
+                className={`px-4 py-2 rounded-md text-white font-semibold ${
+                  selectedManager?.emp_id === mgr.emp_id
+                    ? "bg-blue-700"
+                    : "bg-blue-500 hover:bg-blue-600"
+                }`}
+              >
+                {mgr.emp_email}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="flex space-x-6 overflow-x-auto pb-6">
+          {columns.map((column) => (
+            <div key={column.id} className="flex-shrink-0 w-80">
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <div className={`w-3 h-3 rounded-full ${column.color}`}></div>
+                  <h2 className="font-medium text-gray-900">
+                    {column.title} ({column.tasks.length})
+                  </h2>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {column.tasks.map((task) => (
+                  <TaskCard key={task.issue_id} task={task} />
+                ))}
+                {column.tasks.length === 0 && (
+                  <p className="text-xs text-gray-400 text-center">No issues</p>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
       {selectedIssue && (
         <IssueDetailModal issue={selectedIssue} onClose={() => setSelectedIssue(null)} />
       )}
-    </>
+    </div>
   );
 }

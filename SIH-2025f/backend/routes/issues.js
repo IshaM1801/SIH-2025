@@ -11,7 +11,7 @@ const {
   getAllIssues,
   getUserIssues,
   fetchAddress,
- 
+ assignIssueToEmployee,
   classifyReport,
   getDeptIssues,
   updateIssueStatus,
@@ -26,6 +26,7 @@ router.get('/dept', authMiddleware, getDeptIssues);
 router.patch('/update-status/:issueId', authMiddleware, updateIssueStatus);
 router.post("/classify-report", authMiddleware, classifyReport);
 router.post("/fetch-address", authMiddleware, fetchAddress);
+router.post("/assign-issue",authMiddleware, assignIssueToEmployee)
 
 
 //

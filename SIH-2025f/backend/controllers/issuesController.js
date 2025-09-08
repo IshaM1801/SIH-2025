@@ -352,6 +352,42 @@ const classifyReport = async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 };
+// Assign an issue to an employee
+const assignIssueToEmployee = async (req, res) => {
+  try {
+    const { issueId, emp_email } = req.body; // emp_email = employee_registry.emp_email
+
+    if (!issueId || !emp_email) {
+      return res.status(400).json({ error: "issueId and emp_email are required" });
+    }
+
+    // Update employee_registry only if position == 0
+    const { data, error } = await supabase
+      .from("employee_registry")
+      .update({ issue_id: issueId })
+      .eq("emp_email", emp_email) // use emp_email from request
+      .eq("position", 0)
+      .select("*")
+      .single();
+
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
+
+    if (!data) {
+      return res.status(404).json({ error: "Employee not found or not assignable" });
+    }
+
+    res.json({
+      message: `Issue assigned to employee successfully`,
+      employee: data,
+    });
+  } catch (err) {
+    console.error("assignIssueToEmployee error:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
 
 module.exports = {
   getAllIssues,
@@ -361,5 +397,6 @@ module.exports = {
   classifyReport,
   createIssueWithLocation,
   fetchAddress,
+  assignIssueToEmployee,
 
 };

@@ -15,6 +15,7 @@ const {
   classifyReport,
   getDeptIssues,
   updateIssueStatus,
+  fetchHeadIssues,
 createIssueWithLocation,} = require('../controllers/issuesController');
 
 // Routes
@@ -25,6 +26,7 @@ router.get('/dept', authMiddleware, getDeptIssues);
 router.patch('/update-status/:issueId', authMiddleware, updateIssueStatus);
 router.post("/classify-report", authMiddleware, classifyReport);
 router.post("/fetch-address", authMiddleware, fetchAddress);
+router.post("/fetch-head", authMiddleware, fetchHeadIssues);
 
 //
 module.exports = router;

@@ -169,30 +169,65 @@ const { createClient } = require("@supabase/supabase-js");
 
 //  Fetch issues only of the logged-in user's department
 // Fetch issues only of the logged-in user's department
+// Modified getDeptIssues
 const getDeptIssues = async (req, res) => {
   try {
     const employeeEmail = req.user.email;
 
-    // Get logged-in employee's team
     const { data: employee, error: empError } = await supabase
       .from("employee_registry")
-      .select("team_name")
+      .select("emp_id, emp_email, dept_name, team_name, position")
       .eq("emp_email", employeeEmail)
       .single();
 
-    if (empError || !employee || !employee.team_name) {
-      return res.status(403).json({ error: "Employee not found or team not set" });
+    if (empError || !employee) return res.status(403).json({ error: "Employee not found" });
+
+    // Employee fetch their own issues
+    if (employee.position === 1) {
+      if (!employee.team_name) return res.status(403).json({ error: "Team not set" });
+
+      const { data: issues, error } = await supabase.rpc("get_issues_within_team_radius", { p_team_name: employee.team_name });
+      if (error) throw error;
+      return res.json({ issues });
     }
 
-    // Call the Postgres function
-    const { data: issues, error } = await supabase
-      .rpc("get_issues_within_team_radius", { p_team_name: employee.team_name });
+    // HOD fetching issues for a manager
+    if (employee.position === 2) {
+      const { manager_email } = req.query;
 
-    if (error) throw error;
+      if (manager_email) {
+        // Fetch that manager
+        const { data: manager, error: mgrError } = await supabase
+          .from("employee_registry")
+          .select("team_name")
+          .eq("emp_email", manager_email)
+          .eq("dept_name", employee.dept_name) // ensure manager belongs to this HOD
+          .eq("position", 1)
+          .single();
 
-    res.json({ issues });
+        if (mgrError || !manager) return res.status(403).json({ error: "Manager not found" });
+
+        const { data: issues, error } = await supabase.rpc("get_issues_within_team_radius", { p_team_name: manager.team_name });
+        if (error) throw error;
+
+        return res.json({ issues });
+      }
+
+      // If no manager selected, just return HOD info + managers
+      const { data: managers, error: mgrError } = await supabase
+        .from("employee_registry")
+        .select("emp_id, emp_email, team_name")
+        .eq("dept_name", employee.dept_name)
+        .eq("position", 1);
+
+      if (mgrError) throw mgrError;
+
+      return res.json({ hod: employee.emp_email, managers });
+    }
+
+    res.status(403).json({ error: "Access denied" });
   } catch (err) {
-    console.error("getDeptIssues error:", err);
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -298,59 +333,7 @@ const classifyReport = async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 };
-const fetchHeadIssues = async (req, res) => {
-  try {
-    const { email, password } = req.body;
 
-    if (!email || !password) {
-      return res.status(400).json({ error: "Email and password are required" });
-    }
-
-    // 1️⃣ Authenticate HOD
-    const { data: hod, error: hodError } = await supabase
-      .from("employee_registry")
-      .select("emp_id, emp_email, password, dept_name, position")
-      .eq("emp_email", email)
-      .eq("password", password)  // ✅ match your DB column name
-      .eq("position", 2)         // HOD = 2
-      .single();
-
-    if (hodError || !hod) {
-      return res.status(403).json({ error: "Invalid HOD credentials" });
-    }
-
-    // 2️⃣ Fetch managers under this HOD
-    const { data: managers, error: mgrError } = await supabase
-      .from("employee_registry")
-      .select("emp_id, emp_email, team_name")
-      .eq("dept_name", hod.dept_name)
-      .eq("position", 1); // managers
-
-    if (mgrError) throw mgrError;
-
-    if (!managers || managers.length === 0) {
-      return res.json({ message: "No managers found under this HOD", issues: [] });
-    }
-
-    // 3️⃣ Gather team names (skip nulls)
-    const teamNames = managers
-      .map(m => m.team_name)
-      .filter(t => t !== null);
-
-    // 4️⃣ Fetch all issues for this dept + those teams
-   
-    res.json({
-      hod: hod.emp_email,
-      department: hod.dept_name,
-      manager_count: managers.length,
-      managers,
-      
-    });
-  } catch (err) {
-    console.error("fetchHeadIssues error:", err.message);
-    res.status(500).json({ error: err.message });
-  }
-};
 module.exports = {
   getAllIssues,
   getUserIssues,
@@ -359,5 +342,5 @@ module.exports = {
   classifyReport,
   createIssueWithLocation,
   fetchAddress,
-  fetchHeadIssues,
+
 };

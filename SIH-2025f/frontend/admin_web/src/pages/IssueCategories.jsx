@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Calendar, MoreHorizontal, Plus } from "lucide-react";
+import { Calendar } from "lucide-react";
 import IssueDetailModal from "../components/ui/IssueDetailModal";
 
-// Status pill component
+// Status pill
 const StatusPill = ({ status }) => {
   const statusStyles = {
     pending: "bg-yellow-100 text-yellow-800",
@@ -17,9 +17,7 @@ const StatusPill = ({ status }) => {
         statusStyles[status] || "bg-gray-100 text-gray-800"
       }`}
     >
-      {status
-        ? status.replace("_", " ").replace(/\b\w/g, (l) => l.toUpperCase())
-        : "N/A"}
+      {status ? status.replace("_", " ").replace(/\b\w/g, (l) => l.toUpperCase()) : "N/A"}
     </span>
   );
 };
@@ -37,24 +35,20 @@ const formatRelativeTime = (dateString) => {
 
 export default function IssueManager() {
   const [issues, setIssues] = useState([]);
-  const [managers, setManagers] = useState([]);
+  const [team, setTeam] = useState([]); // All team members or managers
   const [isHod, setIsHod] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [selectedManager, setSelectedManager] = useState(null);
+  const [selectedMember, setSelectedMember] = useState(null);
   const [selectedIssue, setSelectedIssue] = useState(null);
 
   const navigate = useNavigate();
   const token = localStorage.getItem("employee_token");
 
-  // Fetch employee/HOD data
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      if (!token) {
-        setError("Authentication required. Please login again.");
-        return;
-      }
+      if (!token) return setError("Authentication required. Please login again.");
 
       const res = await fetch("http://localhost:5001/issues/dept", {
         headers: { Authorization: `Bearer ${token}` },
@@ -71,15 +65,27 @@ export default function IssueManager() {
 
       const data = await res.json();
 
-      if (data.issues) {
-        // Employee view
-        setIsHod(false);
-        setIssues(data.issues);
-      } else if (data.managers) {
-        // HOD view
+      // HOD view
+      if (data.managers) {
         setIsHod(true);
-        setManagers(data.managers);
+        setTeam(data.managers);
+        setSelectedMember(null);
+        setIssues([]);
       }
+      // Manager view (team)
+      else if (data.team) {
+        setIsHod(false);
+        setTeam(data.team);
+        setSelectedMember(null);
+        setIssues([]);
+      }
+      // Employee view (issues only)
+      else if (data.issues) {
+        setIsHod(false);
+        setTeam([]);
+        setIssues(data.issues);
+      }
+
       setError(null);
     } catch (err) {
       console.error("Error fetching data:", err);
@@ -89,24 +95,10 @@ export default function IssueManager() {
     }
   }, [navigate, token]);
 
-  // Fetch issues for a selected manager (HOD only)
-  const fetchManagerIssues = async (manager) => {
-    try {
-      setLoading(true);
-      setSelectedManager(manager);
-      const res = await fetch(
-        `http://localhost:5001/issues/dept?manager_email=${manager.emp_email}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      setIssues(data.issues || []);
-    } catch (err) {
-      console.error("Error fetching manager issues:", err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+  // Fetch issues for selected manager or employee (team member)
+  const fetchMemberIssues = (member) => {
+    setSelectedMember(member);
+    setIssues(member.issues || []);
   };
 
   // Update issue status
@@ -145,55 +137,28 @@ export default function IssueManager() {
 
   // Map issues to Kanban columns
   const columns = [
-    {
-      id: 1,
-      title: "Pending",
-      color: "bg-yellow-500",
-      tasks: issues.filter(issue => issue.status === "pending"),
-    },
-    {
-      id: 2,
-      title: "In Progress",
-      color: "bg-purple-500",
-      tasks: issues.filter(issue => issue.status === "in_progress"),
-    },
-    {
-      id: 3,
-      title: "Resolved",
-      color: "bg-green-500",
-      tasks: issues.filter(issue => issue.status === "resolved"),
-    },
-    {
-      id: 4,
-      title: "Rejected",
-      color: "bg-red-500",
-      tasks: issues.filter(issue => issue.status === "rejected"),
-    }
+    { id: 1, title: "Pending", color: "bg-yellow-500", tasks: issues.filter(i => i.status === "pending") },
+    { id: 2, title: "In Progress", color: "bg-purple-500", tasks: issues.filter(i => i.status === "in_progress") },
+    { id: 3, title: "Resolved", color: "bg-green-500", tasks: issues.filter(i => i.status === "resolved") },
+    { id: 4, title: "Rejected", color: "bg-red-500", tasks: issues.filter(i => i.status === "rejected") },
   ];
 
-  // Task card component
+  // Task card
   const TaskCard = ({ task }) => (
     <div className="bg-white rounded-lg border border-gray-200 p-4 mb-3 shadow-sm hover:shadow-md transition-shadow">
       <div className="flex justify-between items-start mb-3">
-        <h3 className="text-sm font-medium text-gray-900 leading-tight pr-2">
-          {task.issue_title}
-        </h3>
+        <h3 className="text-sm font-medium text-gray-900 leading-tight pr-2">{task.issue_title}</h3>
       </div>
-
       <div className="mb-3">
         <StatusPill status={task.status} />
       </div>
-
       <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          {task.created_at && (
-            <div className={`flex items-center space-x-1 text-gray-500`}>
-              <Calendar className="w-3 h-3" />
-              <span className="text-xs">{formatRelativeTime(task.created_at)}</span>
-            </div>
-          )}
-        </div>
-
+        {task.created_at && (
+          <div className="flex items-center space-x-1 text-gray-500">
+            <Calendar className="w-3 h-3" />
+            <span className="text-xs">{formatRelativeTime(task.created_at)}</span>
+          </div>
+        )}
         <select
           value={task.status}
           onChange={(e) => updateStatus(task.issue_id, e.target.value)}
@@ -211,19 +176,19 @@ export default function IssueManager() {
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
-        {isHod && (
+        {(isHod || team.length > 0) && (
           <div className="mb-6 flex flex-wrap gap-2">
-            {managers.map((mgr) => (
+            {team.map((member) => (
               <button
-                key={mgr.emp_id}
-                onClick={() => fetchManagerIssues(mgr)}
+                key={member.emp_id || member.emp_email}
+                onClick={() => fetchMemberIssues(member)}
                 className={`px-4 py-2 rounded-md text-white font-semibold ${
-                  selectedManager?.emp_id === mgr.emp_id
+                  selectedMember?.emp_email === member.emp_email
                     ? "bg-blue-700"
                     : "bg-blue-500 hover:bg-blue-600"
                 }`}
               >
-                {mgr.emp_email}
+                {member.emp_name || member.emp_email}
               </button>
             ))}
           </div>
@@ -240,7 +205,6 @@ export default function IssueManager() {
                   </h2>
                 </div>
               </div>
-
               <div className="space-y-3">
                 {column.tasks.map((task) => (
                   <TaskCard key={task.issue_id} task={task} />
@@ -254,9 +218,7 @@ export default function IssueManager() {
         </div>
       </div>
 
-      {selectedIssue && (
-        <IssueDetailModal issue={selectedIssue} onClose={() => setSelectedIssue(null)} />
-      )}
+      {selectedIssue && <IssueDetailModal issue={selectedIssue} onClose={() => setSelectedIssue(null)} />}
     </div>
   );
 }

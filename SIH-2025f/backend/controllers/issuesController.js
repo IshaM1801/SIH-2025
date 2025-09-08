@@ -182,29 +182,49 @@ const getDeptIssues = async (req, res) => {
 
     if (empError || !employee) return res.status(403).json({ error: "Employee not found" });
 
-    // Employee fetch their own issues
+    // MANAGER: fetch all team employees + issues
     if (employee.position === 1) {
       if (!employee.team_name) return res.status(403).json({ error: "Team not set" });
 
-      const { data: issues, error } = await supabase.rpc("get_issues_within_team_radius", { p_team_name: employee.team_name });
-      if (error) throw error;
-      return res.json({ issues });
+      // Fetch all employees in the same team
+      const { data: teamMembers, error: teamError } = await supabase
+        .from("employee_registry")
+        .select("emp_id, emp_email, name")
+        .eq("team_name", employee.team_name)
+        .eq("position", 0); // 0 = regular employee
+      if (teamError) throw teamError;
+
+      // Fetch all issues within team radius
+      const { data: issues, error: issueError } = await supabase.rpc("get_issues_within_team_radius", { p_team_name: employee.team_name });
+      if (issueError) throw issueError;
+
+      // Map issues to employees
+      const teamWithIssues = teamMembers.map((member) => ({
+        ...member,
+        issues: issues.filter((issue) => issue.assigned_to === member.emp_email),
+      }));
+
+      // Include unassigned issues
+      const unassignedIssues = issues.filter((issue) => !issue.assigned_to);
+      if (unassignedIssues.length > 0) {
+        teamWithIssues.push({ emp_name: "Unassigned", issues: unassignedIssues, emp_email: "unassigned" });
+      }
+
+      return res.json({ manager: employee.emp_email, team: teamWithIssues });
     }
 
-    // HOD fetching issues for a manager
+    // HOD fetching issues for a manager or managers
     if (employee.position === 2) {
       const { manager_email } = req.query;
 
       if (manager_email) {
-        // Fetch that manager
         const { data: manager, error: mgrError } = await supabase
           .from("employee_registry")
           .select("team_name")
           .eq("emp_email", manager_email)
-          .eq("dept_name", employee.dept_name) // ensure manager belongs to this HOD
+          .eq("dept_name", employee.dept_name)
           .eq("position", 1)
           .single();
-
         if (mgrError || !manager) return res.status(403).json({ error: "Manager not found" });
 
         const { data: issues, error } = await supabase.rpc("get_issues_within_team_radius", { p_team_name: manager.team_name });
@@ -213,7 +233,6 @@ const getDeptIssues = async (req, res) => {
         return res.json({ issues });
       }
 
-      // If no manager selected, just return HOD info + managers
       const { data: managers, error: mgrError } = await supabase
         .from("employee_registry")
         .select("emp_id, emp_email, team_name")

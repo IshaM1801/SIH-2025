@@ -1,4 +1,3 @@
-// src/pages/Map.jsx
 import React, { useEffect, useRef } from "react";
 
 function Map() {
@@ -21,10 +20,23 @@ function Map() {
         const data = await res.json();
         console.log("✅ Raw response from backend:", data);
 
-        // Extract issues array correctly
-        const issues = Array.isArray(data.issues) ? data.issues : [];
-        console.log("✅ Normalized issues array:", issues);
+        // Flatten issues from employees
+        const issues = [];
+        if (data.team && Array.isArray(data.team)) {
+          data.team.forEach((emp) => {
+            if (emp.issues && Array.isArray(emp.issues)) {
+              emp.issues.forEach((issue) => {
+                issues.push({
+                  ...issue,
+                  emp_email: emp.emp_email,
+                  emp_name: emp.name || emp.emp_name || "Unassigned",
+                });
+              });
+            }
+          });
+        }
 
+        console.log("✅ Flattened issues:", issues);
         return issues;
       } catch (err) {
         console.error("❌ Error fetching issues:", err);
@@ -82,8 +94,11 @@ function Map() {
             content: `
               <div style="max-width:250px;">
                 <h3>${issue.issue_title || "Issue"}</h3>
-                <p>${issue.issue_description || ""}</p>
+                <p><b>Description:</b> ${issue.issue_description || ""}</p>
                 <p><b>Address:</b> ${issue.address_component || ""}</p>
+                <p><b>Assigned to:</b> ${issue.emp_name} (${issue.emp_email})</p>
+                <p><b>Status:</b> ${issue.status}</p>
+                <p><b>Created at:</b> ${new Date(issue.created_at).toLocaleString()}</p>
                 ${
                   issue.image_url
                     ? `<img src="${issue.image_url}" alt="issue" style="width:100%;margin-top:5px;"/>`
@@ -101,11 +116,10 @@ function Map() {
       if (!bounds.isEmpty()) map.fitBounds(bounds);
     };
 
-    // Initial load
     loadMap();
 
     // Refetch every 10 seconds
-    const interval = setInterval(loadMap, 10000);
+    const interval = setInterval(loadMap, 100000);
 
     return () => {
       delete window.initMap;

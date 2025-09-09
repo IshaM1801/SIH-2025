@@ -1,3 +1,4 @@
+// index.js
 const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
@@ -7,16 +8,18 @@ const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
 const issueRoutes = require("./routes/issues");
 const certificatesRoutes = require("./routes/certificates");
-const employeeRoutes = require("./routes/employee")
+const employeeRoutes = require("./routes/employee");
+const aiRoutes = require("./routes/aiAllManagerIssues"); // ✅ CommonJS require
+
 const app = express();
 const PORT = process.env.PORT || 5001;
 
-// CORS setup
+// --- CORS setup ---
 app.use(cors({
   origin: "http://localhost:5173", // your frontend URL
   methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
-  credentials: true // allow cookies if needed
+  credentials: true
 }));
 
 app.use(express.json());
@@ -24,10 +27,10 @@ app.use(express.urlencoded({ extended: true }));
 
 app.set("trust proxy", true); // to fetch real IP of user
 
-// Test route
-app.get("/", (req, res) => res.send("server hi"));
+// --- Test route ---
+app.get("/", (req, res) => res.send("Server is running!"));
 
-// Email verification finalize route
+// --- Email verification route ---
 app.post("/auth/finalize-verification", async (req, res) => {
   const { access_token, name, phone } = req.body;
   if (!access_token) return res.status(400).json({ error: "Missing token" });
@@ -53,11 +56,13 @@ app.post("/auth/finalize-verification", async (req, res) => {
   }
 });
 
-// Mount routes
+// --- Mount routes ---
 app.use("/auth", authRoutes);
 app.use("/user", userRoutes);
 app.use("/issues", issueRoutes);
 app.use("/certificates", certificatesRoutes);
 app.use("/employee", employeeRoutes);
-// Start server
+app.use("/ai", aiRoutes); // ✅ mounted router
+
+// --- Start server ---
 app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));

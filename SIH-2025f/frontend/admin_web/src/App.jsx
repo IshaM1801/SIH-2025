@@ -8,7 +8,7 @@ import ReportIssuePage from "./pages/ReportIssuePage";
 import ReportManagement from "./pages/ReportManagement";
 import CitizenManagement from "./pages/CitizenManagement";
 import IssueCategories from "./pages/IssueCategories";
-import DepartmentAssignment from "./pages/DepartmentAssignment";
+import AIefficiency from "./pages/AIefficiency";
 import TaskRouting from "./pages/TaskRouting";
 import EscalationManagement from "./pages/EscalationManagement";
 import PerformanceMonitoring from "./pages/PerformanceMonitoring";
@@ -82,10 +82,10 @@ function App() {
             }
           />
           <Route
-            path="/department-assignment"
+            path="/ai-efficiency"
             element={
               <AdminProtectedRoute>
-                <DepartmentAssignment />
+                <AIefficiency />
               </AdminProtectedRoute>
             }
           />

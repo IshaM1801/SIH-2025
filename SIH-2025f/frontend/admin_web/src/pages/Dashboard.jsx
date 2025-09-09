@@ -112,7 +112,7 @@ const Dashboard = () => {
     { icon: Users, label: 'Citizen & Department Management', active: false },
     { icon: BarChart, label: 'KPI Dashboard & Analytics', active: true },
     { icon: Settings, label: 'Issue Categories Setup', active: false },
-    { icon: Users, label: 'Department Assignment', active: false },
+    { icon: Users, label: 'AI agent efficiency calculator', active: false },
     { icon: RefreshCw, label: 'Task Routing Module', active: false },
     { icon: Shield, label: 'Escalation Management', active: false },
     { icon: BookOpen, label: 'Performance Monitoring', active: false },

@@ -50,8 +50,8 @@ const Sidebar = ({ adminData }) => {
     { icon: Sliders, label: "Issue Categories Setup", path: "/categories" },
     {
       icon: GitBranch,
-      label: "Department Assignment",
-      path: "/department-assignment",
+      label: "AI agent efficiency calculator",
+      path: "/ai-efficiency",
     },
     { icon: RefreshCw, label: "Task Routing Module", path: "/task-routing" },
     { icon: ShieldAlert, label: "Escalation Management", path: "/escalations" },

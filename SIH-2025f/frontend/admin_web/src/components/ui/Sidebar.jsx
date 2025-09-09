@@ -11,6 +11,7 @@ import {
   Activity,
   MessageSquare,
   ChevronLeft,
+  Map as MapIcon,
   ChevronRight,
 } from "lucide-react";
 
@@ -47,6 +48,7 @@ const Sidebar = ({ adminData }) => {
       path: "/citizens",
     },
     { icon: BarChart3, label: "Analytics", path: "/dashboard" },
+    { icon: MapIcon, label: "Map", path: "/map" }, // <-- New Map option
     { icon: Sliders, label: "Issue Categories Setup", path: "/categories" },
     {
       icon: GitBranch,

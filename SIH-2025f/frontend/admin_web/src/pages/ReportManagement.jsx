@@ -44,11 +44,6 @@ const priorityStyles = {
   Medium: "bg-yellow-100 text-yellow-800 ring-yellow-600/20",
   Low: "bg-sky-100 text-sky-800 ring-sky-600/20",
 };
-const mapDotStyles = {
-  High: "bg-red-500",
-  Medium: "bg-yellow-500",
-  Low: "bg-sky-500",
-};
 
 const ReportManagementPage = () => {
   const token = localStorage.getItem("employee_token");
@@ -58,6 +53,7 @@ const ReportManagementPage = () => {
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState({ status: "All", priority: "All" });
+  const [reassigningIssue, setReassigningIssue] = useState(null); // 🔑 Track which issue is in reassign mode
 
   // --- Fetch manager issues ---
   const fetchManagerIssues = async () => {
@@ -127,7 +123,7 @@ const ReportManagementPage = () => {
 
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      const updatedIssue = { ...data.issue, status: "pending" };
+      const updatedIssue = { ...data.issue, status: "pending", emp_name: team.find(e => e.emp_email === emp_email)?.name || "Unknown" };
 
       // Remove from unassigned
       setUnassignedIssues((prev) => prev.filter((i) => i.issue_id !== issueId));
@@ -142,6 +138,9 @@ const ReportManagementPage = () => {
         }
         return [...prev, updatedIssue];
       });
+
+      // exit reassign mode
+      setReassigningIssue(null);
     } catch (err) {
       console.error("Error assigning issue:", err);
     }
@@ -254,25 +253,48 @@ const ReportManagementPage = () => {
                       <option value="resolved">Resolved</option>
                     </select>
 
-                    {/* Assign/Reassign Dropdown */}
-                    <select
-                      onChange={(e) =>
-                        assignIssue(report.issue_id, e.target.value)
-                      }
-                      className="px-2 py-1 text-xs border rounded-lg"
-                      defaultValue=""
-                    >
-                      <option value="" disabled>
-                        {assignedIssues.find((i) => i.issue_id === report.issue_id)
-                          ? "Re-Assign"
-                          : "Assign"}
-                      </option>
-                      {team.map((emp) => (
-                        <option key={emp.emp_email} value={emp.emp_email}>
-                          {emp.name}
-                        </option>
-                      ))}
-                    </select>
+                    {/* Assign / Reassign */}
+                    {assignedIssues.find((i) => i.issue_id === report.issue_id) ? (
+                      reassigningIssue === report.issue_id ? (
+                        <select
+                          onChange={(e) => assignIssue(report.issue_id, e.target.value)}
+                          className="px-2 py-1 text-xs border rounded-lg"
+                          defaultValue=""
+                        >
+                          <option value="" disabled>Select employee</option>
+                          {team.map((emp) => (
+                            <option key={emp.emp_email} value={emp.emp_email}>
+                              {emp.name}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <span className="px-3 py-1 text-xs rounded-lg bg-green-100 text-green-800">
+                            Assigned to {report.emp_name}
+                          </span>
+                          <button
+                            onClick={() => setReassigningIssue(report.issue_id)}
+                            className="text-xs text-blue-600 hover:underline"
+                          >
+                            Reassign
+                          </button>
+                        </div>
+                      )
+                    ) : (
+                      <select
+                        onChange={(e) => assignIssue(report.issue_id, e.target.value)}
+                        className="px-2 py-1 text-xs border rounded-lg"
+                        defaultValue=""
+                      >
+                        <option value="" disabled>Assign</option>
+                        {team.map((emp) => (
+                          <option key={emp.emp_email} value={emp.emp_email}>
+                            {emp.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
 
                     <span
                       className={`px-2 py-1 text-xs font-medium rounded-full ring-1 ${

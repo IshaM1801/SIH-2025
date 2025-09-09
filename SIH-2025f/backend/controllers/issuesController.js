@@ -3,31 +3,6 @@ const axios = require("axios");
 const { sendWhatsAppMessage } = require("../services/whatsappService");
 
 
- const fetchAddress = async (req, res) => {
-  try {
-    const { latitude, longitude } = req.body;
-
-    if (!latitude || !longitude) {
-      return res.status(400).json({ error: "Latitude and longitude are required" });
-    }
-
-    const openCageKey = "ceefcaa44fd14d259322d6c1000b06c3";
-    const geoCodeRes = await axios.get(
-      `https://api.opencagedata.com/geocode/v1/json?q=${latitude}+${longitude}&key=${openCageKey}&no_annotations=1`
-    );
-
-    let formattedAddress = "Address not found";
-    if (geoCodeRes.data?.results?.length > 0) {
-      const c = geoCodeRes.data.results[0].components;
-      formattedAddress = `${c.suburb || c.neighbourhood || c.village || ""}, ${c.city || c.town || c.village || ""}, ${c.state || ""}`;
-    }
-
-    res.json({ address: formattedAddress });
-  } catch (err) {
-    console.error("Error in fetchAddress:", err.message);
-    res.status(500).json({ error: "Failed to fetch address" });
-  }
-};
 const createIssueWithLocation = async (req, res) => {
   try {
     const { issue_title, issue_description, department, latitude, longitude } = req.body;
@@ -46,7 +21,7 @@ const createIssueWithLocation = async (req, res) => {
       let clientIp = req.headers["x-forwarded-for"]?.split(",")[0] || req.socket?.remoteAddress;
 
       if (!clientIp || clientIp === "::1" || clientIp === "127.0.0.1") {
-        clientIp = "8.8.8.8";
+        clientIp = "8.8.8.8"; // fallback to Google DNS for testing
       }
 
       const apiKey = process.env.IPGEO_API_KEY;
@@ -58,10 +33,23 @@ const createIssueWithLocation = async (req, res) => {
       lng = geoResponse.data?.longitude;
     }
 
-    // Reverse geocode with OpenCage
-    
+    // 2️⃣ Reverse geocode with OpenCage
+    let formattedAddress = "Address not found";
+    try {
+      const openCageKey = process.env.OPENCAGE_KEY || "ceefcaa44fd14d259322d6c1000b06c3";
+      const geoCodeRes = await axios.get(
+        `https://api.opencagedata.com/geocode/v1/json?q=${lat}+${lng}&key=${openCageKey}&no_annotations=1`
+      );
 
-    // 2️⃣ Handle image upload
+      if (geoCodeRes.data?.results?.length > 0) {
+        const c = geoCodeRes.data.results[0].components;
+        formattedAddress = `${c.suburb || c.neighbourhood || c.village || ""}, ${c.city || c.town || c.village || ""}, ${c.state || ""}`;
+      }
+    } catch (geoErr) {
+      console.warn("⚠️ Reverse geocode failed:", geoErr.message);
+    }
+
+    // 3️⃣ Handle image upload
     let imageUrl = null;
     if (req.file) {
       const file = req.file;
@@ -85,7 +73,7 @@ const createIssueWithLocation = async (req, res) => {
       imageUrl = publicData.publicUrl;
     }
 
-    // 3️⃣ Insert issue into Supabase
+    // 4️⃣ Insert issue into Supabase
     const { data, error } = await supabase
       .from("issues")
       .insert([
@@ -174,49 +162,70 @@ const getDeptIssues = async (req, res) => {
   try {
     const employeeEmail = req.user.email;
 
+    // Fetch logged-in employee
     const { data: employee, error: empError } = await supabase
       .from("employee_registry")
-      .select("emp_id, emp_email, dept_name, team_name, position")
+      .select("emp_id, emp_email, dept_name, team_name, position, issue_id, name")
       .eq("emp_email", employeeEmail)
       .single();
 
     if (empError || !employee) return res.status(403).json({ error: "Employee not found" });
 
-    // MANAGER: fetch all team employees + issues
+    // ------------------ MANAGER ------------------
     if (employee.position === 1) {
       if (!employee.team_name) return res.status(403).json({ error: "Team not set" });
 
-      // Fetch all employees in the same team
+      // Fetch all employees in the team
       const { data: teamMembers, error: teamError } = await supabase
         .from("employee_registry")
-        .select("emp_id, emp_email, name")
+        .select("emp_id, emp_email, name, issue_id")
         .eq("team_name", employee.team_name)
         .eq("position", 0); // 0 = regular employee
       if (teamError) throw teamError;
 
-      // Fetch all issues within team radius
-      const { data: issues, error: issueError } = await supabase.rpc("get_issues_within_team_radius", { p_team_name: employee.team_name });
+      // Fetch all issues in team (RPC or table)
+      const { data: issues, error: issueError } = await supabase.rpc("get_issues_within_team_radius", {
+        p_team_name: employee.team_name,
+      });
       if (issueError) throw issueError;
 
-      // Map issues to employees
-      const teamWithIssues = teamMembers.map((member) => ({
-        ...member,
-        issues: issues.filter((issue) => issue.assigned_to === member.emp_email),
-      }));
+      // Map issues to employees using issue_id column
+      const teamWithIssues = teamMembers.map((member) => {
+        const issueIds = member.issue_id ? member.issue_id.split(",") : []; // adjust if array type
+        const memberIssues = issues.filter((issue) => issueIds.includes(issue.issue_id));
+        return { ...member, issues: memberIssues };
+      });
 
-      // Include unassigned issues
-      const unassignedIssues = issues.filter((issue) => !issue.assigned_to);
+      // Include unassigned issues (those not in any employee.issue_id)
+      const allAssignedIds = teamMembers
+        .map((m) => (m.issue_id ? m.issue_id.split(",") : []))
+        .flat();
+
+      const unassignedIssues = issues.filter((issue) => !allAssignedIds.includes(issue.issue_id));
+
       if (unassignedIssues.length > 0) {
-        teamWithIssues.push({ emp_name: "Unassigned", issues: unassignedIssues, emp_email: "unassigned" });
+        teamWithIssues.push({ emp_name: "Unassigned", emp_email: "unassigned", issues: unassignedIssues });
       }
 
       return res.json({ manager: employee.emp_email, team: teamWithIssues });
     }
 
-    // HOD fetching issues for a manager or managers
+    // ------------------ HOD ------------------
     if (employee.position === 2) {
-      const { manager_email } = req.query;
+      const { manager_email, issue_id } = req.query;
 
+      // Fetch single issue if issue_id is provided
+      if (issue_id) {
+        const { data: issue, error: singleIssueError } = await supabase
+          .from("issues")
+          .select("*")
+          .eq("issue_id", issue_id)
+          .single();
+        if (singleIssueError || !issue) return res.status(404).json({ error: "Issue not found" });
+        return res.json({ issue });
+      }
+
+      // Fetch issues for a particular manager
       if (manager_email) {
         const { data: manager, error: mgrError } = await supabase
           .from("employee_registry")
@@ -227,12 +236,15 @@ const getDeptIssues = async (req, res) => {
           .single();
         if (mgrError || !manager) return res.status(403).json({ error: "Manager not found" });
 
-        const { data: issues, error } = await supabase.rpc("get_issues_within_team_radius", { p_team_name: manager.team_name });
+        const { data: issues, error } = await supabase.rpc("get_issues_within_team_radius", {
+          p_team_name: manager.team_name,
+        });
         if (error) throw error;
 
         return res.json({ issues });
       }
 
+      // HOD fetching all managers in dept
       const { data: managers, error: mgrError } = await supabase
         .from("employee_registry")
         .select("emp_id, emp_email, team_name")
@@ -250,7 +262,6 @@ const getDeptIssues = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
-
 // Add this function to issuesController.js
 const updateIssueStatus = async (req, res) => {
   const { issueId } = req.params;
@@ -396,7 +407,7 @@ module.exports = {
   updateIssueStatus,
   classifyReport,
   createIssueWithLocation,
-  fetchAddress,
+  
   assignIssueToEmployee,
 
 };

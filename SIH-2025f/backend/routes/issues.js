@@ -10,7 +10,7 @@ const upload = multer({ storage });
 const {
   getAllIssues,
   getUserIssues,
-  fetchAddress,
+  
  assignIssueToEmployee,
   classifyReport,
   getDeptIssues,
@@ -22,10 +22,13 @@ createIssueWithLocation,} = require('../controllers/issuesController');
 router.get('/', authMiddleware, getAllIssues);
 router.get('/user/:userId', authMiddleware, getUserIssues);
 router.post('/create', authMiddleware, upload.single("photo"), createIssueWithLocation);
-router.get('/dept', authMiddleware, getDeptIssues);
+router.get("/dept/:issue_id",authMiddleware, getDeptIssues);
+
+// ✅ Fetch issues depending on role (Manager/HOD logic)
+router.get("/dept", authMiddleware, getDeptIssues);
 router.patch('/update-status/:issueId', authMiddleware, updateIssueStatus);
 router.post("/classify-report", authMiddleware, classifyReport);
-router.post("/fetch-address", authMiddleware, fetchAddress);
+
 router.post("/assign-issue",authMiddleware, assignIssueToEmployee)
 
 

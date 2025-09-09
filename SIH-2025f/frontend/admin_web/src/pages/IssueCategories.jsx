@@ -279,24 +279,45 @@ export default function IssueManager() {
         </div>
 
         {/* Employee issues */}
-        {selectedEmployee && selectedEmployee.issues.length > 0 ? (
-          <div className="space-y-4">
-            {selectedEmployee.issues.map((issue) => (
-              <div key={issue.issue_id} className="bg-white p-4 rounded shadow">
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="text-sm font-medium">{issue.issue_title}</h3>
-                  <StatusPill status={issue.status} />
-                </div>
-                <p className="text-xs text-gray-500 mb-1">{issue.issue_description}</p>
-                <span className="text-xs text-gray-400">
-                  {formatRelativeTime(issue.created_at)}
-                </span>
-              </div>
-            ))}
-          </div>
-        ) : selectedEmployee ? (
-          <p className="text-gray-400 text-sm">No issues assigned</p>
-        ) : null}
+      {/* Employee issues */}
+{selectedEmployee && selectedEmployee.issues.length > 0 ? (
+  <div className="space-y-4">
+    {selectedEmployee.issues.map((issue) => (
+      <div
+        key={issue.issue_id}
+        className="bg-white p-4 rounded shadow cursor-pointer hover:bg-gray-50"
+        onClick={async () => {
+          try {
+            const res = await fetch(
+              `http://localhost:5001/issues/dept/${issue.issue_id}`,
+              {
+                headers: { Authorization: `Bearer ${token}` },
+              }
+            );
+
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+            const data = await res.json();
+            console.log("📌 Issue details:", data); // ✅ log the full JSON
+          } catch (err) {
+            console.error("Error fetching issue details:", err);
+          }
+        }}
+      >
+        <div className="flex justify-between items-start mb-2">
+          <h3 className="text-sm font-medium">{issue.issue_title}</h3>
+          <StatusPill status={issue.status} />
+        </div>
+        <p className="text-xs text-gray-500 mb-1">{issue.issue_description}</p>
+        <span className="text-xs text-gray-400">
+          {formatRelativeTime(issue.created_at)}
+        </span>
+      </div>
+    ))}
+  </div>
+) : selectedEmployee ? (
+  <p className="text-gray-400 text-sm">No issues assigned</p>
+) : null}
       </div>
 
       {selectedIssue && (

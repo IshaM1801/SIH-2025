@@ -1,0 +1,15 @@
+{
+  "dependencies": {
+    "@google/genai": "^1.18.0",
+    "@radix-ui/react-select": "^2.2.6",
+    "canvas": "^3.2.0",
+    "dotenv": "^17.2.2",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^2.0.2",
+    "twilio": "^5.9.0",
+    "wkx": "^0.5.0"
+  },
+  "devDependencies": {
+    "@types/geojson": "^7946.0.16"
+  }
+}

@@ -53,7 +53,7 @@ const ReportManagementPage = () => {
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState({ status: "All", priority: "All" });
-  const [reassigningIssue, setReassigningIssue] = useState(null); // 🔑 Track which issue is in reassign mode
+  const [reassigningIssue, setReassigningIssue] = useState(null);
 
   // --- Fetch manager issues ---
   const fetchManagerIssues = async () => {
@@ -65,21 +65,22 @@ const ReportManagementPage = () => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
 
-      const assigned = [];
-      let unassigned = [];
+      const uniqueIssuesMap = {};
 
       data.team.forEach((member) => {
-        if (member.emp_email !== "unassigned") {
-          member.issues.forEach((issue) =>
-            assigned.push({ ...issue, emp_name: member.name })
-          );
-        } else {
-          unassigned = member.issues;
-        }
+        member.issues.forEach((issue) => {
+          if (!uniqueIssuesMap[issue.issue_id]) {
+            uniqueIssuesMap[issue.issue_id] = {
+              ...issue,
+              emp_name: member.emp_email !== "unassigned" ? member.name : null,
+            };
+          }
+        });
       });
 
-      setAssignedIssues(assigned);
-      setUnassignedIssues(unassigned);
+      const allIssues = Object.values(uniqueIssuesMap);
+      setAssignedIssues(allIssues.filter((i) => i.emp_name));
+      setUnassignedIssues(allIssues.filter((i) => !i.emp_name));
     } catch (err) {
       console.error("Error fetching manager issues:", err);
     } finally {
@@ -123,23 +124,22 @@ const ReportManagementPage = () => {
 
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      const updatedIssue = { ...data.issue, status: "pending", emp_name: team.find(e => e.emp_email === emp_email)?.name || "Unknown" };
+      const updatedIssue = {
+        ...data.issue,
+        status: "pending",
+        emp_name: team.find((e) => e.emp_email === emp_email)?.name || "Unknown",
+      };
 
-      // Remove from unassigned
       setUnassignedIssues((prev) => prev.filter((i) => i.issue_id !== issueId));
 
-      // Add/update in assigned list
       setAssignedIssues((prev) => {
         const exists = prev.find((i) => i.issue_id === issueId);
         if (exists) {
-          return prev.map((i) =>
-            i.issue_id === issueId ? updatedIssue : i
-          );
+          return prev.map((i) => (i.issue_id === issueId ? updatedIssue : i));
         }
         return [...prev, updatedIssue];
       });
 
-      // exit reassign mode
       setReassigningIssue(null);
     } catch (err) {
       console.error("Error assigning issue:", err);
@@ -181,21 +181,10 @@ const ReportManagementPage = () => {
         (filters.status === "All" || issue.status === filters.status) &&
         (filters.priority === "All" || issue.priority === filters.priority) &&
         (issue.issue_title.toLowerCase().includes(searchLower) ||
-          issue.address_component.toLowerCase().includes(searchLower))
+          (issue.address_component || "").toLowerCase().includes(searchLower))
       );
     });
   }, [assignedIssues, unassignedIssues, filters, searchTerm]);
-
-  // --- Analytics ---
-  const analytics = useMemo(() => {
-    const allIssues = [...assignedIssues, ...unassignedIssues];
-    return {
-      total: allIssues.length,
-      pending: allIssues.filter((i) => i.status === "pending").length,
-      inProgress: allIssues.filter((i) => i.status === "In Progress").length,
-      resolved: allIssues.filter((i) => i.status === "resolved").length,
-    };
-  }, [assignedIssues, unassignedIssues]);
 
   const getRelativeDate = (dateString) => {
     const today = new Date();
@@ -224,7 +213,7 @@ const ReportManagementPage = () => {
             <ul className="divide-y divide-gray-200">
               {filteredIssues.map((report) => (
                 <li
-                  key={report.issue_id}
+                  key={report.issue_id} // now each issue_id appears only once
                   className="p-4 hover:bg-gray-50 transition flex flex-col sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div>
@@ -238,7 +227,6 @@ const ReportManagementPage = () => {
                   </div>
 
                   <div className="flex flex-wrap gap-2 mt-3 sm:mt-0 sm:ml-4 items-center">
-                    {/* Status Selector */}
                     <select
                       value={report.status}
                       onChange={(e) =>
@@ -253,8 +241,7 @@ const ReportManagementPage = () => {
                       <option value="resolved">Resolved</option>
                     </select>
 
-                    {/* Assign / Reassign */}
-                    {assignedIssues.find((i) => i.issue_id === report.issue_id) ? (
+                    {report.emp_name ? (
                       reassigningIssue === report.issue_id ? (
                         <select
                           onChange={(e) => assignIssue(report.issue_id, e.target.value)}

@@ -366,32 +366,46 @@ const classifyReport = async (req, res) => {
 // Assign an issue to an employee
 const assignIssueToEmployee = async (req, res) => {
   try {
-    const { issueId, emp_email } = req.body; // emp_email = employee_registry.emp_email
+    const { issueId, emp_email } = req.body; // emp_email comes from frontend
 
     if (!issueId || !emp_email) {
       return res.status(400).json({ error: "issueId and emp_email are required" });
     }
 
-    // Update employee_registry only if position == 0
-    const { data, error } = await supabase
+    // 1️⃣ Find employee by email
+    const { data: employee, error: empError } = await supabase
       .from("employee_registry")
-      .update({ issue_id: issueId })
-      .eq("emp_email", emp_email) // use emp_email from request
-      .eq("position", 0)
+      .select("emp_id, emp_email, position")
+      .eq("emp_email", emp_email)
+      .single();
+
+    if (empError) {
+      return res.status(500).json({ error: empError.message });
+    }
+
+    if (!employee) {
+      return res.status(404).json({ error: "Employee not found" });
+    }
+
+    // (Optional) Only allow assignment if position == 0
+    if (employee.position !== 0) {
+      return res.status(403).json({ error: "Employee not assignable (position != 0)" });
+    }
+
+    // 2️⃣ Insert into junction table employee_issue_map
+    const { data: mapping, error: mapError } = await supabase
+      .from("employee_issue_map")
+      .insert([{ emp_id: employee.emp_id, issue_id: issueId }])
       .select("*")
       .single();
 
-    if (error) {
-      return res.status(500).json({ error: error.message });
-    }
-
-    if (!data) {
-      return res.status(404).json({ error: "Employee not found or not assignable" });
+    if (mapError) {
+      return res.status(500).json({ error: mapError.message });
     }
 
     res.json({
-      message: `Issue assigned to employee successfully`,
-      employee: data,
+      message: "Issue assigned to employee successfully",
+      mapping,
     });
   } catch (err) {
     console.error("assignIssueToEmployee error:", err);

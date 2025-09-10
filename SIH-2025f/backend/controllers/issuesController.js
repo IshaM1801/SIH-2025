@@ -161,6 +161,8 @@ const { createClient } = require("@supabase/supabase-js");
 const getDeptIssues = async (req, res) => {
   try {
     const employeeEmail = req.user.email;
+    const { issue_id } = req.params; // <-- from URL param
+    const { manager_email } = req.query; // <-- optional query
 
     // Fetch logged-in employee
     const { data: employee, error: empError } = await supabase
@@ -171,87 +173,73 @@ const getDeptIssues = async (req, res) => {
 
     if (empError || !employee) return res.status(403).json({ error: "Employee not found" });
 
-    // ------------------ MANAGER ------------------
+    // ---------------- SINGLE ISSUE FETCH ----------------
+    if (issue_id) {
+      const { data: issue, error: singleIssueError } = await supabase
+        .from("issues")
+        .select("*")
+        .eq("issue_id", issue_id)
+        .single();
+
+      if (singleIssueError || !issue) return res.status(404).json({ error: "Issue not found" });
+      return res.json({ issue });
+    }
+
+    // ---------------- MANAGER ----------------
     if (employee.position === 1) {
       if (!employee.team_name) return res.status(403).json({ error: "Team not set" });
 
-      // Fetch all employees in the team
-      const { data: teamMembers, error: teamError } = await supabase
+      const { data: teamMembers } = await supabase
         .from("employee_registry")
         .select("emp_id, emp_email, name, issue_id")
         .eq("team_name", employee.team_name)
-        .eq("position", 0); // 0 = regular employee
-      if (teamError) throw teamError;
+        .eq("position", 0);
 
-      // Fetch all issues in team (RPC or table)
-      const { data: issues, error: issueError } = await supabase.rpc("get_issues_within_team_radius", {
+      const { data: issues } = await supabase.rpc("get_issues_within_team_radius", {
         p_team_name: employee.team_name,
       });
-      if (issueError) throw issueError;
 
-      // Map issues to employees using issue_id column
       const teamWithIssues = teamMembers.map((member) => {
-        const issueIds = member.issue_id ? member.issue_id.split(",") : []; // adjust if array type
-        const memberIssues = issues.filter((issue) => issueIds.includes(issue.issue_id));
+        const ids = member.issue_id ? member.issue_id.split(",").map(id => id.trim()) : [];
+        const memberIssues = issues.filter((i) => ids.includes(i.issue_id));
         return { ...member, issues: memberIssues };
       });
 
-      // Include unassigned issues (those not in any employee.issue_id)
       const allAssignedIds = teamMembers
-        .map((m) => (m.issue_id ? m.issue_id.split(",") : []))
+        .map((m) => (m.issue_id ? m.issue_id.split(",").map(id => id.trim()) : []))
         .flat();
 
-      const unassignedIssues = issues.filter((issue) => !allAssignedIds.includes(issue.issue_id));
-
-      if (unassignedIssues.length > 0) {
-        teamWithIssues.push({ emp_name: "Unassigned", emp_email: "unassigned", issues: unassignedIssues });
-      }
+      const unassigned = issues.filter((i) => !allAssignedIds.includes(i.issue_id));
+      if (unassigned.length > 0) teamWithIssues.push({ emp_name: "Unassigned", emp_email: "unassigned", issues: unassigned });
 
       return res.json({ manager: employee.emp_email, team: teamWithIssues });
     }
 
-    // ------------------ HOD ------------------
+    // ---------------- HOD ----------------
     if (employee.position === 2) {
-      const { manager_email, issue_id } = req.query;
-
-      // Fetch single issue if issue_id is provided
-      if (issue_id) {
-        const { data: issue, error: singleIssueError } = await supabase
-          .from("issues")
-          .select("*")
-          .eq("issue_id", issue_id)
-          .single();
-        if (singleIssueError || !issue) return res.status(404).json({ error: "Issue not found" });
-        return res.json({ issue });
-      }
-
-      // Fetch issues for a particular manager
+      // Fetch manager issues if query param given
       if (manager_email) {
-        const { data: manager, error: mgrError } = await supabase
+        const { data: manager } = await supabase
           .from("employee_registry")
           .select("team_name")
           .eq("emp_email", manager_email)
           .eq("dept_name", employee.dept_name)
           .eq("position", 1)
           .single();
-        if (mgrError || !manager) return res.status(403).json({ error: "Manager not found" });
 
-        const { data: issues, error } = await supabase.rpc("get_issues_within_team_radius", {
+        const { data: issues } = await supabase.rpc("get_issues_within_team_radius", {
           p_team_name: manager.team_name,
         });
-        if (error) throw error;
 
-        return res.json({ issues });
+        return res.json({ manager: manager_email, issues });
       }
 
-      // HOD fetching all managers in dept
-      const { data: managers, error: mgrError } = await supabase
+      // Else, HOD fetching all managers in dept
+      const { data: managers } = await supabase
         .from("employee_registry")
         .select("emp_id, emp_email, team_name")
         .eq("dept_name", employee.dept_name)
         .eq("position", 1);
-
-      if (mgrError) throw mgrError;
 
       return res.json({ hod: employee.emp_email, managers });
     }

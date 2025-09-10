@@ -304,6 +304,8 @@ const updateIssueStatus = async (req, res) => {
   }
 };
 
+
+
 const classifyReport = async (req, res) => {
   try {
     const { reportId } = req.body;
@@ -319,18 +321,69 @@ const classifyReport = async (req, res) => {
       return res.status(404).json({ error: "Report not found" });
     }
 
-    // 2. Send image_url to FastAPI
-    const fastApiRes = await axios.post("http://127.0.0.1:8000/predict_url", {
-      image_url: report.image_url,
-    });
+    console.log("🔍 Report fetched:", report);
 
-    if (!fastApiRes.data || !fastApiRes.data.predicted_class) {
-      return res.status(500).json({ error: "FastAPI did not return a prediction" });
+    // 2. Download image from Supabase public URL
+    const imgRes = await fetch(report.image_url);
+    if (!imgRes.ok) {
+      throw new Error(`Failed to fetch image: ${imgRes.status}`);
+    }
+    const imgBuffer = await imgRes.arrayBuffer();
+    const base64Image = Buffer.from(imgBuffer).toString("base64");
+
+    // Detect mime type from extension
+    const mimeType = report.image_url.endsWith(".png")
+      ? "image/png"
+      : report.image_url.endsWith(".jpg") || report.image_url.endsWith(".jpeg")
+      ? "image/jpeg"
+      : "image/webp";
+
+    // 3. Call Gemini Vision API
+    let geminiRes;
+    try {
+      geminiRes = await axios.post(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${process.env.GEMINI_API_KEY}`,
+        {
+          contents: [
+            {
+              parts: [
+                {
+                  text: `Classify the civic issue shown in the image into:
+      1. **Department** (Water, Roads, Electricity, Waste, Other)
+      2. **Priority** (Low, Medium, High)
+      
+      Return the result in strict JSON format like:
+      {
+        "department": "<DEPARTMENT>",
+        "priority": "<PRIORITY>"
+      }`
+                },
+                {
+                  inline_data: {
+                    mime_type: mimeType,
+                    data: base64Image,
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      );
+    } catch (err) {
+      console.error("❌ Gemini error:", err.response?.data || err.message);
+      return res.status(500).json({
+        error: "Gemini classification failed",
+        details: err.response?.data || err.message,
+      });
     }
 
-    const predictedDept = fastApiRes.data.predicted_class;
+    console.log("✅ Gemini response:", geminiRes.data);
 
-    // 3. Update Supabase issues table
+    const predictedDept =
+      geminiRes.data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ||
+      "Unclassified";
+
+    // 4. Update Supabase issues table
     const { error: updateError } = await supabase
       .from("issues")
       .update({ department: predictedDept })
@@ -344,13 +397,15 @@ const classifyReport = async (req, res) => {
       success: true,
       reportId,
       department: predictedDept,
-      fastApiResponse: fastApiRes.data,
+      geminiResponse: geminiRes.data,
     });
   } catch (err) {
     console.error("Classification error:", err.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };
+
+module.exports = { classifyReport };
 // Assign an issue to an employee
 const assignIssueToEmployee = async (req, res) => {
   try {

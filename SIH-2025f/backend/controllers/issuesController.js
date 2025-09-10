@@ -366,62 +366,97 @@ const classifyReport = async (req, res) => {
 // Assign an issue to an employee
 const assignIssueToEmployee = async (req, res) => {
   try {
-    const { issueId, emp_email } = req.body; // emp_email comes from frontend
+    const { issueId, emp_emails } = req.body;
 
-    if (!issueId || !emp_email) {
-      return res.status(400).json({ error: "issueId and emp_email are required" });
+    if (!issueId || !emp_emails) {
+      return res.status(400).json({ error: "issueId and emp_emails are required" });
     }
 
-    // 1️⃣ Find employee by email
-    const { data: employee, error: empError } = await supabase
+    // Normalize to array
+    const emails = Array.isArray(emp_emails) ? emp_emails : [emp_emails];
+
+    // 1️⃣ Fetch employees by email
+    const { data: employees, error: empError } = await supabase
       .from("employee_registry")
       .select("emp_id, emp_email, position")
-      .eq("emp_email", emp_email)
-      .single();
+      .in("emp_email", emails);
 
     if (empError) {
       return res.status(500).json({ error: empError.message });
     }
 
-    if (!employee) {
-      return res.status(404).json({ error: "Employee not found" });
+    if (!employees || employees.length === 0) {
+      return res.status(404).json({ error: "No employees found" });
     }
 
-    // (Optional) Only allow assignment if position == 0
-    if (employee.position !== 0) {
-      return res.status(403).json({ error: "Employee not assignable (position != 0)" });
+    // 2️⃣ (Optional) filter by position
+    const assignable = employees.filter(e => e.position === 0);
+
+    if (assignable.length === 0) {
+      return res.status(403).json({ error: "No assignable employees (position != 0)" });
     }
 
-    // 2️⃣ Insert into junction table employee_issue_map
-    const { data: mapping, error: mapError } = await supabase
+    // 3️⃣ Prepare rows for bulk insert
+    const rowsToInsert = assignable.map(e => ({
+      emp_id: e.emp_id,
+      issue_id: issueId,
+    }));
+
+    // 4️⃣ Bulk insert (⚠️ no `.single()`)
+    const { data: mappings, error: mapError } = await supabase
       .from("employee_issue_map")
-      .insert([{ emp_id: employee.emp_id, issue_id: issueId }])
-      .select("*")
-      .single();
+      .insert(rowsToInsert)
+      .select("*"); // 👈 keep it as array
 
     if (mapError) {
       return res.status(500).json({ error: mapError.message });
     }
 
     res.json({
-      message: "Issue assigned to employee successfully",
-      mapping,
+      message: "Issue assigned to employees successfully",
+      mappings, // will be an array of inserted rows
     });
   } catch (err) {
     console.error("assignIssueToEmployee error:", err);
     res.status(500).json({ error: err.message });
   }
 };
+// ✅ Remove assignment function
+const removeIssueAssignment = async (req, res) => {
+  try {
+    const { issueId } = req.body; // issueId comes from frontend
 
+    if (!issueId) {
+      return res.status(400).json({ error: "issueId is required" });
+    }
+
+    // 1️⃣ Delete all mappings for this issueId
+    const { error: deleteError } = await supabase
+      .from("employee_issue_map")
+      .delete()
+      .eq("issue_id", issueId);
+
+    if (deleteError) {
+      return res.status(500).json({ error: deleteError.message });
+    }
+
+    res.json({
+      message: `All assignments for issue ${issueId} removed successfully`,
+    });
+  } catch (err) {
+    console.error("removeIssueAssignment error:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
 
 module.exports = {
   getAllIssues,
   getUserIssues,
+  assignIssueToEmployee,
+  removeIssueAssignment, // 👈 make sure name matches router
+  classifyReport,
   getDeptIssues,
   updateIssueStatus,
-  classifyReport,
+ 
   createIssueWithLocation,
-  
-  assignIssueToEmployee,
-
 };

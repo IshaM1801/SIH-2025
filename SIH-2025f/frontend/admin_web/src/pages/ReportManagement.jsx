@@ -54,6 +54,7 @@ const ReportManagementPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState({ status: "All", priority: "All" });
   const [reassigningIssue, setReassigningIssue] = useState(null);
+  const [selectedEmployees, setSelectedEmployees] = useState({}); // { issueId: [emails] }
 
   // --- Fetch manager issues ---
   const fetchManagerIssues = async () => {
@@ -108,10 +109,11 @@ const ReportManagementPage = () => {
     fetchTeam();
   }, []);
 
-  // --- Assign / Reassign Issue ---
-  const assignIssue = async (issueId, emp_email) => {
+  // --- Assign Issue (multi employees) ---
+  const assignMultipleEmployees = async (issueId) => {
     try {
-      if (!token) return;
+      const emp_emails = selectedEmployees[issueId] || [];
+      if (!emp_emails.length) return alert("Select at least one employee");
 
       const res = await fetch("http://localhost:5001/issues/assign-issue", {
         method: "POST",
@@ -119,58 +121,71 @@ const ReportManagementPage = () => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ issueId, emp_email }),
+        body: JSON.stringify({ issueId, emp_emails }),
       });
-
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      const updatedIssue = {
-        ...data.issue,
-        status: "pending",
-        emp_name: team.find((e) => e.emp_email === emp_email)?.name || "Unknown",
-      };
-
-      setUnassignedIssues((prev) => prev.filter((i) => i.issue_id !== issueId));
-
-      setAssignedIssues((prev) => {
-        const exists = prev.find((i) => i.issue_id === issueId);
-        if (exists) {
-          return prev.map((i) => (i.issue_id === issueId ? updatedIssue : i));
-        }
-        return [...prev, updatedIssue];
-      });
-
+      await res.json();
+      alert("Issue assigned successfully");
+      fetchManagerIssues();
       setReassigningIssue(null);
+      setSelectedEmployees((prev) => ({ ...prev, [issueId]: [] }));
     } catch (err) {
-      console.error("Error assigning issue:", err);
+      console.error("Error assigning employees:", err);
     }
+  };
+
+  const toggleEmployeeSelection = (issueId, empEmail) => {
+    setSelectedEmployees((prev) => {
+      const prevSelected = prev[issueId] || [];
+      if (prevSelected.includes(empEmail)) {
+        return { ...prev, [issueId]: prevSelected.filter((e) => e !== empEmail) };
+      } else {
+        return { ...prev, [issueId]: [...prevSelected, empEmail] };
+      }
+    });
   };
 
   // --- Update issue status ---
-  const updateStatus = async (issueId, newStatus) => {
-    try {
-      if (!token) return;
-      const res = await fetch(
-        `http://localhost:5001/issues/update-status/${issueId}`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ status: newStatus }),
-        }
-      );
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const updatedIssueData = await res.json();
+ // --- Update issue status ---
+// --- Update issue status ---
+const updateStatus = async (issueId, newStatus) => {
+  try {
+    if (!token) return;
+    const res = await fetch(
+      `http://localhost:5001/issues/update-status/${issueId}`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ status: newStatus }),
+      }
+    );
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const updatedIssueData = await res.json();
 
-      setAssignedIssues((prev) =>
-        prev.map((i) => (i.issue_id === issueId ? updatedIssueData.issue : i))
-      );
-    } catch (err) {
-      console.error("Error updating status:", err);
-    }
-  };
+    // Update both assigned and unassigned arrays
+    setAssignedIssues((prev) =>
+      prev.map((i) =>
+        i.issue_id === issueId ? { ...i, status: newStatus } : i
+      )
+    );
+    setUnassignedIssues((prev) =>
+      prev.map((i) =>
+        i.issue_id === issueId ? { ...i, status: newStatus } : i
+      )
+    );
+
+    // Close any dropdown if open
+    setReassigningIssue(null);
+
+    // Alert after state update
+    setTimeout(() => alert(`Status updated to ${newStatus}`), 0);
+  } catch (err) {
+    console.error("Error updating status:", err);
+  }
+};
 
   // --- Filtered issues ---
   const filteredIssues = useMemo(() => {
@@ -213,7 +228,7 @@ const ReportManagementPage = () => {
             <ul className="divide-y divide-gray-200">
               {filteredIssues.map((report) => (
                 <li
-                  key={report.issue_id} // now each issue_id appears only once
+                  key={report.issue_id}
                   className="p-4 hover:bg-gray-50 transition flex flex-col sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div>
@@ -241,47 +256,39 @@ const ReportManagementPage = () => {
                       <option value="resolved">Resolved</option>
                     </select>
 
-                    {report.emp_name ? (
-                      reassigningIssue === report.issue_id ? (
-                        <select
-                          onChange={(e) => assignIssue(report.issue_id, e.target.value)}
-                          className="px-2 py-1 text-xs border rounded-lg"
-                          defaultValue=""
-                        >
-                          <option value="" disabled>Select employee</option>
+                    {/* Assignment dropdown */}
+                    <div className="relative">
+                      {reassigningIssue === report.issue_id ? (
+                        <div className="absolute z-10 bg-white border rounded-lg shadow p-2">
                           {team.map((emp) => (
-                            <option key={emp.emp_email} value={emp.emp_email}>
-                              {emp.name}
-                            </option>
+                            <label
+                              key={emp.emp_email}
+                              className="flex items-center space-x-2 py-1"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={(selectedEmployees[report.issue_id] || []).includes(emp.emp_email)}
+                                onChange={() => toggleEmployeeSelection(report.issue_id, emp.emp_email)}
+                              />
+                              <span>{emp.name}</span>
+                            </label>
                           ))}
-                        </select>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <span className="px-3 py-1 text-xs rounded-lg bg-green-100 text-green-800">
-                            Assigned to {report.emp_name}
-                          </span>
                           <button
-                            onClick={() => setReassigningIssue(report.issue_id)}
-                            className="text-xs text-blue-600 hover:underline"
+                            onClick={() => assignMultipleEmployees(report.issue_id)}
+                            className="mt-2 w-full bg-blue-600 text-white text-xs py-1 px-2 rounded"
                           >
-                            Reassign
+                            Assign
                           </button>
                         </div>
-                      )
-                    ) : (
-                      <select
-                        onChange={(e) => assignIssue(report.issue_id, e.target.value)}
-                        className="px-2 py-1 text-xs border rounded-lg"
-                        defaultValue=""
-                      >
-                        <option value="" disabled>Assign</option>
-                        {team.map((emp) => (
-                          <option key={emp.emp_email} value={emp.emp_email}>
-                            {emp.name}
-                          </option>
-                        ))}
-                      </select>
-                    )}
+                      ) : (
+                        <button
+                          onClick={() => setReassigningIssue(report.issue_id)}
+                          className="px-2 py-1 text-xs border rounded-lg"
+                        >
+                          Assign
+                        </button>
+                      )}
+                    </div>
 
                     <span
                       className={`px-2 py-1 text-xs font-medium rounded-full ring-1 ${

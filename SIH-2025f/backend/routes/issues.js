@@ -6,17 +6,17 @@ const multer = require("multer");
 // Multer setup for file uploads
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
-
 const {
   getAllIssues,
   getUserIssues,
-  
- assignIssueToEmployee,
+  removeIssueAssignment,   // 👈 expects this name
+  assignIssueToEmployee,
   classifyReport,
   getDeptIssues,
   updateIssueStatus,
-  fetchHeadIssues,
-createIssueWithLocation,} = require('../controllers/issuesController');
+
+  createIssueWithLocation,
+} = require('../controllers/issuesController');
 
 // Routes
 router.get('/', authMiddleware, getAllIssues);
@@ -29,7 +29,8 @@ router.get("/dept", authMiddleware, getDeptIssues);
 router.patch('/update-status/:issueId', authMiddleware, updateIssueStatus);
 router.post("/classify-report", authMiddleware, classifyReport);
 
-router.post("/assign-issue",authMiddleware, assignIssueToEmployee)
+router.post("/assign-issue",authMiddleware, assignIssueToEmployee);
+router.post("/deassign", authMiddleware,removeIssueAssignment);
 
 
 //

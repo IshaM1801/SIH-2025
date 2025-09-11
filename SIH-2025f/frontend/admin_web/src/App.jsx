@@ -18,7 +18,8 @@ import Layout from "./components/Layout";
 import { Routes, Route, Navigate } from "react-router-dom";
 import UserAccount from "./pages/UserAccount";
 import Map from "./pages/Map";
-import CertificatesPage from './pages/CertificatesPage'
+import CertificatesPage from "./pages/CertificatesPage";
+import CommunityIssues from "./pages/CommunityIssues";
 
 // Protected Route Components
 function AdminProtectedRoute({ children }) {
@@ -132,6 +133,16 @@ function App() {
             </UserProtectedRoute>
           }
         />
+
+        <Route
+          path="/community-issues"
+          element={
+            <UserProtectedRoute>
+              <CommunityIssues />
+            </UserProtectedRoute>
+          }
+        />
+
         <Route
           path="/report-issue"
           element={

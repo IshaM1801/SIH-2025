@@ -161,97 +161,108 @@ const { createClient } = require("@supabase/supabase-js");
 const getDeptIssues = async (req, res) => {
   try {
     const employeeEmail = req.user.email;
+    const { issue_id } = req.params; // <-- from URL param
+    const { manager_email } = req.query; // <-- optional query
 
     // Fetch logged-in employee
     const { data: employee, error: empError } = await supabase
       .from("employee_registry")
-      .select("emp_id, emp_email, dept_name, team_name, position, issue_id, name")
+      .select("emp_id, emp_email, dept_name, team_name, position, name")
       .eq("emp_email", employeeEmail)
       .single();
 
     if (empError || !employee) return res.status(403).json({ error: "Employee not found" });
 
-    // ------------------ MANAGER ------------------
+    // ---------------- SINGLE ISSUE FETCH ----------------
+    if (issue_id) {
+      const { data: issue, error: singleIssueError } = await supabase
+        .from("issues")
+        .select("*")
+        .eq("issue_id", issue_id)
+        .single();
+
+      if (singleIssueError || !issue) return res.status(404).json({ error: "Issue not found" });
+      return res.json({ issue });
+    }
+
+    // ---------------- EMPLOYEE ----------------
+    if (employee.position === 0) {
+      // Fetch all issues assigned to this employee from employee_issues_map
+      const { data: assignments, error: assignError } = await supabase
+        .from("employee_issue_map")
+        .select("issue_id")
+        .eq("emp_id", employee.emp_id);
+
+      if (assignError) return res.status(500).json({ error: assignError.message });
+
+      const issueIds = assignments.map(a => a.issue_id);
+      if (issueIds.length === 0) return res.json({ employee: employee.emp_email, issues: [] });
+
+      const { data: issues, error: issuesError } = await supabase
+        .from("issues")
+        .select("*")
+        .in("issue_id", issueIds);
+
+      if (issuesError) return res.status(500).json({ error: issuesError.message });
+
+      return res.json({ employee: employee.emp_email, issues });
+    }
+
+    // ---------------- MANAGER ----------------
     if (employee.position === 1) {
       if (!employee.team_name) return res.status(403).json({ error: "Team not set" });
 
-      // Fetch all employees in the team
-      const { data: teamMembers, error: teamError } = await supabase
+      const { data: teamMembers } = await supabase
         .from("employee_registry")
         .select("emp_id, emp_email, name, issue_id")
         .eq("team_name", employee.team_name)
-        .eq("position", 0); // 0 = regular employee
-      if (teamError) throw teamError;
+        .eq("position", 0);
 
-      // Fetch all issues in team (RPC or table)
-      const { data: issues, error: issueError } = await supabase.rpc("get_issues_within_team_radius", {
+      const { data: issues } = await supabase.rpc("get_issues_within_team_radius", {
         p_team_name: employee.team_name,
       });
-      if (issueError) throw issueError;
 
-      // Map issues to employees using issue_id column
       const teamWithIssues = teamMembers.map((member) => {
-        const issueIds = member.issue_id ? member.issue_id.split(",") : []; // adjust if array type
-        const memberIssues = issues.filter((issue) => issueIds.includes(issue.issue_id));
+        const ids = member.issue_id ? member.issue_id.split(",").map(id => id.trim()) : [];
+        const memberIssues = issues.filter((i) => ids.includes(i.issue_id));
         return { ...member, issues: memberIssues };
       });
 
-      // Include unassigned issues (those not in any employee.issue_id)
       const allAssignedIds = teamMembers
-        .map((m) => (m.issue_id ? m.issue_id.split(",") : []))
+        .map((m) => (m.issue_id ? m.issue_id.split(",").map(id => id.trim()) : []))
         .flat();
 
-      const unassignedIssues = issues.filter((issue) => !allAssignedIds.includes(issue.issue_id));
-
-      if (unassignedIssues.length > 0) {
-        teamWithIssues.push({ emp_name: "Unassigned", emp_email: "unassigned", issues: unassignedIssues });
-      }
+      const unassigned = issues.filter((i) => !allAssignedIds.includes(i.issue_id));
+      if (unassigned.length > 0) teamWithIssues.push({ emp_name: "Unassigned", emp_email: "unassigned", issues: unassigned });
 
       return res.json({ manager: employee.emp_email, team: teamWithIssues });
     }
 
-    // ------------------ HOD ------------------
+    // ---------------- HOD ----------------
     if (employee.position === 2) {
-      const { manager_email, issue_id } = req.query;
-
-      // Fetch single issue if issue_id is provided
-      if (issue_id) {
-        const { data: issue, error: singleIssueError } = await supabase
-          .from("issues")
-          .select("*")
-          .eq("issue_id", issue_id)
-          .single();
-        if (singleIssueError || !issue) return res.status(404).json({ error: "Issue not found" });
-        return res.json({ issue });
-      }
-
-      // Fetch issues for a particular manager
+      // Fetch manager issues if query param given
       if (manager_email) {
-        const { data: manager, error: mgrError } = await supabase
+        const { data: manager } = await supabase
           .from("employee_registry")
           .select("team_name")
           .eq("emp_email", manager_email)
           .eq("dept_name", employee.dept_name)
           .eq("position", 1)
           .single();
-        if (mgrError || !manager) return res.status(403).json({ error: "Manager not found" });
 
-        const { data: issues, error } = await supabase.rpc("get_issues_within_team_radius", {
+        const { data: issues } = await supabase.rpc("get_issues_within_team_radius", {
           p_team_name: manager.team_name,
         });
-        if (error) throw error;
 
-        return res.json({ issues });
+        return res.json({ manager: manager_email, issues });
       }
 
-      // HOD fetching all managers in dept
-      const { data: managers, error: mgrError } = await supabase
+      // Else, HOD fetching all managers in dept
+      const { data: managers } = await supabase
         .from("employee_registry")
         .select("emp_id, emp_email, team_name")
         .eq("dept_name", employee.dept_name)
         .eq("position", 1);
-
-      if (mgrError) throw mgrError;
 
       return res.json({ hod: employee.emp_email, managers });
     }
@@ -270,9 +281,18 @@ const updateIssueStatus = async (req, res) => {
   if (!status) return res.status(400).json({ error: "Status is required" });
 
   try {
+    // 0️⃣ Get user info from request (assuming you have a middleware that sets req.user)
+    const user = req.user; // { emp_email, position, ... }
+    console.log("➡️ User trying to update status:", user);
+
+    // 1️⃣ Permission check: position 0 = regular employee
+    if (user.position === 0) {
+      return res.status(403).json({ error: "You are not allowed to update issue status" });
+    }
+
     console.log("➡️ Updating issue:", issueId, "with status:", status);
 
-    // 1️⃣ Update issue status
+    // 2️⃣ Update issue status in Supabase
     const { data, error } = await supabase
       .from("issues")
       .update({ status })
@@ -286,7 +306,7 @@ const updateIssueStatus = async (req, res) => {
     }
     console.log("✅ Updated issue:", data);
 
-    // 2️⃣ Fetch profile
+    // 3️⃣ Fetch user profile to send WhatsApp
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("name, phone")
@@ -298,7 +318,7 @@ const updateIssueStatus = async (req, res) => {
     }
     console.log("👤 Profile fetched:", profile);
 
-    // 3️⃣ Send WhatsApp
+    // 4️⃣ Send WhatsApp notification if phone exists
     if (profile?.phone) {
       const msg = `Hello ${profile.name},\n\nYour issue *${data.issue_title}* is now marked as *${status}*.\nCheck the app for details.`;
       console.log("📲 Sending WhatsApp to:", profile.phone, "message:", msg);
@@ -316,6 +336,7 @@ const updateIssueStatus = async (req, res) => {
   }
 };
 
+
 const classifyReport = async (req, res) => {
   try {
     const { reportId } = req.body;
@@ -331,18 +352,69 @@ const classifyReport = async (req, res) => {
       return res.status(404).json({ error: "Report not found" });
     }
 
-    // 2. Send image_url to FastAPI
-    const fastApiRes = await axios.post("http://127.0.0.1:8000/predict_url", {
-      image_url: report.image_url,
-    });
+    console.log("🔍 Report fetched:", report);
 
-    if (!fastApiRes.data || !fastApiRes.data.predicted_class) {
-      return res.status(500).json({ error: "FastAPI did not return a prediction" });
+    // 2. Download image from Supabase public URL
+    const imgRes = await fetch(report.image_url);
+    if (!imgRes.ok) {
+      throw new Error(`Failed to fetch image: ${imgRes.status}`);
+    }
+    const imgBuffer = await imgRes.arrayBuffer();
+    const base64Image = Buffer.from(imgBuffer).toString("base64");
+
+    // Detect mime type from extension
+    const mimeType = report.image_url.endsWith(".png")
+      ? "image/png"
+      : report.image_url.endsWith(".jpg") || report.image_url.endsWith(".jpeg")
+      ? "image/jpeg"
+      : "image/webp";
+
+    // 3. Call Gemini Vision API
+    let geminiRes;
+    try {
+      geminiRes = await axios.post(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${process.env.GEMINI_API_KEY}`,
+        {
+          contents: [
+            {
+              parts: [
+                {
+                  text: `Classify the civic issue shown in the image into:
+      1. **Department** (Water, Roads, Electricity, Waste, Other)
+      2. **Priority** (Low, Medium, High)
+      
+      Return the result in strict JSON format like:
+      {
+        "department": "<DEPARTMENT>",
+        "priority": "<PRIORITY>"
+      }`
+                },
+                {
+                  inline_data: {
+                    mime_type: mimeType,
+                    data: base64Image,
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      );
+    } catch (err) {
+      console.error("❌ Gemini error:", err.response?.data || err.message);
+      return res.status(500).json({
+        error: "Gemini classification failed",
+        details: err.response?.data || err.message,
+      });
     }
 
-    const predictedDept = fastApiRes.data.predicted_class;
+    console.log("✅ Gemini response:", geminiRes.data);
 
-    // 3. Update Supabase issues table
+    const predictedDept =
+      geminiRes.data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ||
+      "Unclassified";
+
+    // 4. Update Supabase issues table
     const { error: updateError } = await supabase
       .from("issues")
       .update({ department: predictedDept })
@@ -356,13 +428,15 @@ const classifyReport = async (req, res) => {
       success: true,
       reportId,
       department: predictedDept,
-      fastApiResponse: fastApiRes.data,
+      geminiResponse: geminiRes.data,
     });
   } catch (err) {
     console.error("Classification error:", err.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };
+
+module.exports = { classifyReport };
 // Assign an issue to an employee
 const assignIssueToEmployee = async (req, res) => {
   try {

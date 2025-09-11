@@ -22,9 +22,10 @@ const {
 router.get('/', authMiddleware, getAllIssues);
 router.get('/user/:userId', authMiddleware, getUserIssues);
 router.post('/create', authMiddleware, upload.single("photo"), createIssueWithLocation);
-router.get("/dept/:issue_id",authMiddleware, getDeptIssues);
+// Fetch single issue by ID
+router.get("/dept/:issue_id", authMiddleware, getDeptIssues);
 
-// ✅ Fetch issues depending on role (Manager/HOD logic)
+// Fetch manager/HOD issues
 router.get("/dept", authMiddleware, getDeptIssues);
 router.patch('/update-status/:issueId', authMiddleware, updateIssueStatus);
 router.post("/classify-report", authMiddleware, classifyReport);

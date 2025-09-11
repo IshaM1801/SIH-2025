@@ -209,49 +209,98 @@ const getDeptIssues = async (req, res) => {
         return res.status(404).json({ error: "Issue not found" });
       return res.json({ issue });
     }
+    if (employee.position === 0) {
+      // 1️⃣ Get issue IDs assigned to this employee
+      const { data: mappings, error: mapError } = await supabase
+        .from("employee_issue_map")
+        .select("issue_id")
+        .eq("emp_id", employee.emp_id);
+
+      if (mapError) return res.status(500).json({ error: mapError.message });
+
+      const assignedIssueIds = mappings.map((m) => m.issue_id);
+
+      if (assignedIssueIds.length === 0) {
+        return res.json({
+          employee: employee.emp_email,
+          issues: [],
+        });
+      }
+
+      // 2️⃣ Fetch issue details
+      const { data: issues, error: issueError } = await supabase
+        .from("issues")
+        .select("*")
+        .in("issue_id", assignedIssueIds);
+
+      if (issueError) return res.status(500).json({ error: issueError.message });
+
+      return res.json({
+        employee: employee.emp_email,
+        issues,
+      });
+    }
 
     // ---------------- MANAGER ----------------
     if (employee.position === 1) {
       if (!employee.team_name)
         return res.status(403).json({ error: "Team not set" });
-
+    
+      // 1️⃣ Fetch team members
       const { data: teamMembers } = await supabase
         .from("employee_registry")
-        .select("emp_id, emp_email, name, issue_id")
+        .select("emp_id, emp_email, name")
         .eq("team_name", employee.team_name)
         .eq("position", 0);
-
+    
+      // 2️⃣ Fetch all issues within radius (using RPC)
       const { data: issues } = await supabase.rpc(
         "get_issues_within_team_radius",
-        {
-          p_team_name: employee.team_name,
-        }
+        { p_team_name: employee.team_name }
       );
-
+    
+      // 3️⃣ Fetch employee-issue mapping
+      const { data: mappings } = await supabase
+        .from("employee_issue_map")
+        .select("emp_id, issue_id");
+    
+      // 4️⃣ Attach assigned employees to each issue
+      const issuesWithAssignments = issues.map((issue) => {
+        const assignedEmployees = mappings
+          .filter((m) => m.issue_id === issue.issue_id)
+          .map((m) => {
+            const emp = teamMembers.find((t) => t.emp_id === m.emp_id);
+            return emp
+              ? { emp_id: emp.emp_id, emp_email: emp.emp_email, name: emp.name }
+              : null;
+          })
+          .filter(Boolean);
+    
+        return { ...issue, assigned_to: assignedEmployees };
+      });
+    
+      // 5️⃣ Separate unassigned and assigned issues
       const teamWithIssues = teamMembers.map((member) => {
-        const ids = member.issue_id
-          ? member.issue_id.split(",").map((id) => id.trim())
-          : [];
-        const memberIssues = issues.filter((i) => ids.includes(i.issue_id));
+        const memberIssues = issuesWithAssignments.filter((i) =>
+          i.assigned_to.some((e) => e.emp_id === member.emp_id)
+        );
         return { ...member, issues: memberIssues };
       });
-
-      const allAssignedIds = teamMembers
-        .map((m) =>
-          m.issue_id ? m.issue_id.split(",").map((id) => id.trim()) : []
-        )
-        .flat();
-
-      const unassigned = issues.filter(
+    
+      const allAssignedIds = mappings.map((m) => m.issue_id);
+      const unassigned = issuesWithAssignments.filter(
         (i) => !allAssignedIds.includes(i.issue_id)
       );
-      if (unassigned.length > 0)
+    
+      if (unassigned.length > 0) {
         teamWithIssues.push({
-          emp_name: "Unassigned",
+          emp_id: null,
           emp_email: "unassigned",
+          name: "Unassigned",
           issues: unassigned,
         });
-
+      }
+    
       return res.json({ manager: employee.emp_email, team: teamWithIssues });
     }
 
@@ -474,45 +523,56 @@ const assignIssueToEmployee = async (req, res) => {
     // 1️⃣ Fetch employees by email
     const { data: employees, error: empError } = await supabase
       .from("employee_registry")
-      .select("emp_id, emp_email, position")
+      .select("emp_id, emp_email, name, position")
       .in("emp_email", emails);
 
-    if (empError) {
-      return res.status(500).json({ error: empError.message });
-    }
-
-    if (!employees || employees.length === 0) {
+    if (empError) return res.status(500).json({ error: empError.message });
+    if (!employees || employees.length === 0)
       return res.status(404).json({ error: "No employees found" });
-    }
 
-    // 2️⃣ (Optional) filter by position
+    // 2️⃣ Filter only assignable employees (position === 0)
     const assignable = employees.filter((e) => e.position === 0);
-
-    if (assignable.length === 0) {
+    if (assignable.length === 0)
       return res
         .status(403)
         .json({ error: "No assignable employees (position != 0)" });
+
+    // 3️⃣ Check if mapping already exists to prevent duplicates
+    const { data: existingMappings } = await supabase
+      .from("employee_issue_map")
+      .select("emp_id, issue_id")
+      .in("emp_id", assignable.map((e) => e.emp_id))
+      .eq("issue_id", issueId);
+
+    const existingKeys = new Set(
+      existingMappings?.map((m) => `${m.emp_id}-${m.issue_id}`) || []
+    );
+
+    const rowsToInsert = assignable
+      .filter((e) => !existingKeys.has(`${e.emp_id}-${issueId}`))
+      .map((e) => ({
+        emp_id: e.emp_id,
+        issue_id: issueId,
+      }));
+
+    if (rowsToInsert.length === 0) {
+      return res.status(200).json({
+        message: "All employees are already assigned to this issue",
+        mappings: [],
+      });
     }
 
-    // 3️⃣ Prepare rows for bulk insert
-    const rowsToInsert = assignable.map((e) => ({
-      emp_id: e.emp_id,
-      issue_id: issueId,
-    }));
-
-    // 4️⃣ Bulk insert (⚠️ no `.single()`)
+    // 4️⃣ Insert new mappings
     const { data: mappings, error: mapError } = await supabase
       .from("employee_issue_map")
       .insert(rowsToInsert)
-      .select("*"); // 👈 keep it as array
+      .select("*");
 
-    if (mapError) {
-      return res.status(500).json({ error: mapError.message });
-    }
+    if (mapError) return res.status(500).json({ error: mapError.message });
 
     res.json({
       message: "Issue assigned to employees successfully",
-      mappings, // will be an array of inserted rows
+      mappings,
     });
   } catch (err) {
     console.error("assignIssueToEmployee error:", err);

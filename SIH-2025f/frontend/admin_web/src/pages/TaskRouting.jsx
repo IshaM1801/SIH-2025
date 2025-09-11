@@ -33,8 +33,9 @@ const TaskRouting = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [ws, setWs] = useState(null);
+  const [aiLoading, setAiLoading] = useState({}); // Track loading per task
 
-  // --- Fetch employee info and tasks ---
+  // --- Fetch tasks ---
   const fetchTasks = async () => {
     try {
       const resMe = await fetch("http://localhost:5001/employee/me", {
@@ -42,32 +43,22 @@ const TaskRouting = () => {
       });
       if (!resMe.ok) throw new Error(`HTTP ${resMe.status}`);
       const dataMe = await resMe.json();
-      console.log("📄 /employee/me response:", dataMe);
-
       const employee = dataMe.employee;
-      if (!employee) throw new Error("No employee data returned");
-
-      if (employee.position !== 0) {
-        console.log("❌ Not an employee, no tasks assigned");
+      if (!employee || employee.position !== 0) {
         setTasks([]);
         setError("You are not an employee. No tasks assigned.");
         setLoading(false);
         return;
       }
 
-      console.log("✅ Employee detected, fetching tasks for:", employee.name);
-
       const resTasks = await fetch(`http://localhost:5001/issues/dept`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!resTasks.ok) throw new Error(`HTTP ${resTasks.status}`);
       const dataTasks = await resTasks.json();
-      console.log("📄 /employee/tasks response:", dataTasks);
-
       setTasks(dataTasks.issues || []);
       setError(null);
     } catch (err) {
-      console.error("Error fetching tasks:", err);
       setError("Failed to load tasks");
       setTasks([]);
     } finally {
@@ -78,44 +69,62 @@ const TaskRouting = () => {
   // --- WebSocket notifications ---
   useEffect(() => {
     if (!user?.emp_id) return;
-
     const socket = new WebSocket("ws://localhost:8080");
-    window.testWS = socket; // Expose globally for console testing
-
-    socket.onopen = () => {
-      console.log("🔗 WebSocket connected");
-      socket.send(JSON.stringify({ employeeId: user.emp_id }));
-    };
-
+    socket.onopen = () => socket.send(JSON.stringify({ employeeId: user.emp_id }));
     socket.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      console.log("📣 Raw WebSocket message received:", data);
-      if (data.type === "new_issue") {
-        setNotifications((prev) => [data, ...prev]);
-      }
+      if (data.type === "new_issue") setNotifications((prev) => [data, ...prev]);
     };
-
-    socket.onclose = () => console.log("❌ WebSocket disconnected");
-    socket.onerror = (err) => console.error("WebSocket error:", err);
-
     setWs(socket);
-
     return () => socket.close();
   }, [user?.emp_id]);
 
-  // --- Fetch tasks on mount ---
   useEffect(() => {
     fetchTasks();
   }, []);
+
+  // --- AI Update ---
+  const handleAIUpdate = async (issue_id) => {
+    const imageInput = document.createElement("input");
+    imageInput.type = "file";
+    imageInput.accept = "image/*";
+    imageInput.onchange = async (e) => {
+      const fixedImage = e.target.files[0];
+      if (!fixedImage) return;
+
+      const formData = new FormData();
+      formData.append("issue_id", issue_id);
+      formData.append("fixedImage", fixedImage);
+
+      setAiLoading((prev) => ({ ...prev, [issue_id]: true }));
+
+      try {
+        const res = await fetch("http://localhost:5001/agent/update-issue", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData,
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "AI update failed");
+
+        alert(`✅ Issue updated by AI. New status: ${data.aiUpdate.status}`);
+        fetchTasks(); // Refresh task list
+      } catch (err) {
+        alert(`❌ AI update failed: ${err.message}`);
+      } finally {
+        setAiLoading((prev) => ({ ...prev, [issue_id]: false }));
+      }
+    };
+
+    imageInput.click();
+  };
 
   return (
     <div className="bg-gray-50 min-h-screen p-4">
       <h2 className="text-2xl font-bold mb-4">My Tasks</h2>
 
       {loading && <Loader />}
-
       {!loading && error && <p className="text-red-500">{error}</p>}
-
       {!loading && !error && tasks.length === 0 && (
         <p className="text-gray-500">No tasks assigned.</p>
       )}
@@ -133,9 +142,18 @@ const TaskRouting = () => {
                   {task.address_component || "No location"}
                 </p>
               </div>
-              <span className="px-2 py-1 text-xs font-medium rounded-full ring-1 bg-blue-100 text-blue-800">
-                {task.status || "Pending"}
-              </span>
+              <div className="flex items-center space-x-2">
+                <span className="px-2 py-1 text-xs font-medium rounded-full ring-1 bg-blue-100 text-blue-800">
+                  {task.status || "Pending"}
+                </span>
+                <button
+                  disabled={aiLoading[task.issue_id]}
+                  onClick={() => handleAIUpdate(task.issue_id)}
+                  className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50"
+                >
+                  {aiLoading[task.issue_id] ? "Updating..." : "Update Report"}
+                </button>
+              </div>
             </li>
           ))}
         </ul>

@@ -1,6 +1,7 @@
 {
   "dependencies": {
     "@google/genai": "^1.18.0",
+    "@google/generative-ai": "^0.24.1",
     "@radix-ui/react-select": "^2.2.6",
     "canvas": "^3.2.0",
     "dotenv": "^17.2.2",

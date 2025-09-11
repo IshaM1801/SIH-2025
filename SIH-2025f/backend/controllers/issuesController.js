@@ -1,6 +1,8 @@
 const supabase = require("../supabase");
 const axios = require("axios");
 const { sendWhatsAppMessage } = require("../services/whatsappService");
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 const createIssueWithLocation = async (req, res) => {
   try {
@@ -14,8 +16,8 @@ const createIssueWithLocation = async (req, res) => {
     }
 
     // 1️⃣ Handle coordinates
-    let lat = latitude;
-    let lng = longitude;
+    let lat = latitude ? Number(latitude) : null;
+    let lng = longitude ? Number(longitude) : null;
 
     if (!lat || !lng) {
       let clientIp =
@@ -23,59 +25,72 @@ const createIssueWithLocation = async (req, res) => {
         req.socket?.remoteAddress;
 
       if (!clientIp || clientIp === "::1" || clientIp === "127.0.0.1") {
-        clientIp = "8.8.8.8"; // fallback to Google DNS for testing
+        clientIp = "8.8.8.8"; // fallback for localhost/dev
       }
 
-      const apiKey = process.env.IPGEO_API_KEY;
-      const geoResponse = await axios.get(
-        `https://api.ipgeolocation.io/v2/ipgeo?apiKey=${apiKey}&ip=${clientIp}&fields=geo,latitude,longitude`
-      );
-
-      lat = geoResponse.data?.latitude;
-      lng = geoResponse.data?.longitude;
+      try {
+        const apiKey = process.env.IPGEO_API_KEY;
+        const geoResponse = await axios.get(
+          `https://api.ipgeolocation.io/v2/ipgeo?apiKey=${apiKey}&ip=${clientIp}&fields=geo,latitude,longitude`
+        );
+        lat = Number(geoResponse.data?.latitude) || null;
+        lng = Number(geoResponse.data?.longitude) || null;
+      } catch (ipErr) {
+        console.warn("⚠️ IP-based geolocation failed:", ipErr.message);
+      }
     }
 
     // 2️⃣ Reverse geocode with OpenCage
-    let formattedAddress = "Address not found";
-    try {
-      const openCageKey =
-        process.env.OPENCAGE_KEY || "ceefcaa44fd14d259322d6c1000b06c3";
-      const geoCodeRes = await axios.get(
-        `https://api.opencagedata.com/geocode/v1/json?q=${lat}+${lng}&key=${openCageKey}&no_annotations=1`
-      );
+    let formattedAddress = "Unknown location";
+    if (lat && lng) {
+      try {
+        const openCageKey = process.env.OPENCAGE_KEY;
+        const geoCodeRes = await axios.get(
+          `https://api.opencagedata.com/geocode/v1/json?q=${lat}+${lng}&key=${openCageKey}&no_annotations=1`
+        );
 
-      if (geoCodeRes.data?.results?.length > 0) {
-        const c = geoCodeRes.data.results[0].components;
-        formattedAddress = `${
-          c.suburb || c.neighbourhood || c.village || ""
-        }, ${c.city || c.town || c.village || ""}, ${c.state || ""}`;
+        if (geoCodeRes.data?.results?.length > 0) {
+          const c = geoCodeRes.data.results[0].components;
+          formattedAddress = [
+            c.suburb || c.neighbourhood || c.village,
+            c.city || c.town || c.village,
+            c.state,
+            c.country,
+          ]
+            .filter(Boolean)
+            .join(", ");
+        }
+      } catch (geoErr) {
+        console.warn("⚠️ Reverse geocode failed:", geoErr.message);
       }
-    } catch (geoErr) {
-      console.warn("⚠️ Reverse geocode failed:", geoErr.message);
     }
 
     // 3️⃣ Handle image upload
     let imageUrl = null;
     if (req.file) {
-      const file = req.file;
-      const fileExt = file.originalname.split(".").pop();
-      const fileName = `issues/${Date.now()}.${fileExt}`;
+      try {
+        const file = req.file;
+        const fileExt = file.originalname.split(".").pop();
+        const fileName = `issues/${Date.now()}.${fileExt}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from("issue-photos")
-        .upload(fileName, file.buffer, {
-          cacheControl: "3600",
-          upsert: false,
-          contentType: file.mimetype,
-        });
+        const { error: uploadError } = await supabase.storage
+          .from("issue-photos")
+          .upload(fileName, file.buffer, {
+            cacheControl: "3600",
+            upsert: false,
+            contentType: file.mimetype,
+          });
 
-      if (uploadError) throw uploadError;
+        if (uploadError) throw uploadError;
 
-      const { data: publicData } = supabase.storage
-        .from("issue-photos")
-        .getPublicUrl(fileName);
+        const { data: publicData } = supabase.storage
+          .from("issue-photos")
+          .getPublicUrl(fileName);
 
-      imageUrl = publicData.publicUrl;
+        imageUrl = publicData.publicUrl;
+      } catch (uploadErr) {
+        console.error("⚠️ Image upload failed:", uploadErr.message);
+      }
     }
 
     // 4️⃣ Insert issue into Supabase
@@ -99,17 +114,18 @@ const createIssueWithLocation = async (req, res) => {
     if (error) throw error;
 
     res.status(201).json({
+      success: true,
       message: "Issue created successfully",
       issue: data,
       location: {
         latitude: lat,
         longitude: lng,
-        address_component: formattedAddress,
+        address: formattedAddress,
       },
     });
   } catch (err) {
     console.error("createIssueWithLocation error:", err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: "Internal server error" });
   }
 };
 
@@ -332,56 +348,115 @@ const updateIssueStatus = async (req, res) => {
 };
 
 const classifyReport = async (req, res) => {
+  console.log("🟢 classifyReport invoked");
   try {
     const { reportId } = req.body;
+    console.log("➡️ Input reportId:", reportId);
 
-    // 1. Fetch report from Supabase
-    const { data: report, error } = await supabase
-      .from("issues")
-      .select("issue_id, image_url")
-      .eq("issue_id", reportId)
-      .single();
+    // 1. Supabase fetch
+    let issues, error;
+    try {
+      let result = await supabase
+        .from("issues")
+        .select("*")
+        .eq("issue_id", reportId);
 
-    if (error || !report) {
+      issues = result.data;
+      error = result.error;
+    } catch (dbErr) {
+      console.error("❌ Supabase fetch threw exception:", dbErr.message);
+      return res.status(500).json({ error: "Supabase fetch crashed" });
+    }
+
+    if (error) {
+      console.error("❌ Supabase fetch error:", error.message);
+      return res.status(500).json({ error: "Failed to fetch issue" });
+    }
+    if (!issues || issues.length === 0) {
+      console.warn("⚠️ No issue found for reportId:", reportId);
       return res.status(404).json({ error: "Report not found" });
     }
 
-    // 2. Send image_url to FastAPI
-    const fastApiRes = await axios.post("http://127.0.0.1:8000/predict_url", {
-      image_url: report.image_url,
-    });
+    const report = issues[0];
+    console.log("✅ Issue fetched:", report.issue_id, report.image_url);
 
-    if (!fastApiRes.data || !fastApiRes.data.predicted_class) {
-      return res
-        .status(500)
-        .json({ error: "FastAPI did not return a prediction" });
+    // 2. Call Gemini
+    let rawText;
+    try {
+      const model = genAI.getGenerativeModel({
+        model: "gemini-1.5-flash",
+        generationConfig: { responseMimeType: "application/json" },
+      });
+
+      const prompt = {
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                text: `Classify civic issue into: ["water","electricity","road","garbage","other"].
+Return JSON with keys: predicted_class, confidence (0-100), priority_level (high|medium|low), source_url.
+
+Image: ${report.image_url}`,
+              },
+            ],
+          },
+        ],
+      };
+
+      console.log("📡 Sending prompt to Gemini…");
+      const geminiRes = await model.generateContent(prompt);
+      rawText = geminiRes.response.text();
+      console.log("📩 Gemini raw response:", rawText);
+    } catch (aiErr) {
+      console.error("❌ Gemini API error:", aiErr.message);
+      return res.status(500).json({ error: "Gemini call failed" });
     }
 
-    const predictedDept = fastApiRes.data.predicted_class;
-
-    // 3. Update Supabase issues table
-    const { error: updateError } = await supabase
-      .from("issues")
-      .update({ department: predictedDept })
-      .eq("issue_id", reportId);
-
-    if (updateError) {
-      return res
-        .status(500)
-        .json({ error: "Failed to update department in Supabase" });
+    // 3. Parse Gemini response
+    let parsed;
+    try {
+      parsed = JSON.parse(rawText);
+      console.log("✅ Parsed AI response:", parsed);
+    } catch (parseErr) {
+      console.error("❌ JSON parse error:", parseErr.message);
+      return res.status(500).json({ error: "Invalid AI response", raw: rawText });
     }
 
+    // 4. Update Supabase
+    try {
+      const { error: updateError } = await supabase
+        .from("issues")
+        .update({
+          department: parsed.predicted_class,
+          priority: parsed.priority_level,
+        })
+        .eq("issue_id", reportId);
+
+      if (updateError) {
+        console.error("❌ Supabase update error:", updateError.message);
+        return res.status(500).json({ error: "Failed to update Supabase" });
+      }
+      console.log("✅ Supabase updated successfully");
+    } catch (updateCrash) {
+      console.error("❌ Supabase update crashed:", updateCrash.message);
+      return res.status(500).json({ error: "Supabase update crashed" });
+    }
+
+    // 5. Success
     res.json({
       success: true,
       reportId,
-      department: predictedDept,
-      fastApiResponse: fastApiRes.data,
+      department: parsed.predicted_class,
+      GeminiAPIResponse: parsed,
     });
   } catch (err) {
-    console.error("Classification error:", err.message);
-    res.status(500).json({ error: "Internal server error" });
+    console.error("🔥 Unhandled classification error:", err.stack || err.message);
+    res.status(500).json({ error: "Internal server error (unhandled)" });
   }
 };
+    // 3. Update Supabase issues table
+   
 // Assign an issue to an employee
 const assignIssueToEmployee = async (req, res) => {
   try {

@@ -15,96 +15,43 @@ function ReportIssuePage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [coordinates, setCoordinates] = useState({ latitude: null, longitude: null });
-  const [address, setAddress] = useState("");
-  const [addressLoading, setAddressLoading] = useState(false); // ✅ Add loading state for address
 
+  // --- Fetch user location only ---
   useEffect(() => {
-    const fetchLocationAndAddress = async () => {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          async (position) => {
-            const { latitude, longitude } = position.coords;
-            console.log("📍 Fetched coordinates:", latitude, longitude);
-  
-            // ✅ Store as JSON in localStorage
-            const coords = { latitude, longitude };
-            setCoordinates(coords);
-            localStorage.setItem("coords", JSON.stringify(coords));
-            console.log("✅ Coordinates saved:", coords);
-  
-            try {
-              const token = localStorage.getItem("token");
-              setAddressLoading(true); // ✅ Start address loading
-  
-              // Handle both JSON and "lat,long" formats
-              const storedCoords = localStorage.getItem("coords");
-              let lat = latitude;
-              let lng = longitude;
-  
-              if (storedCoords) {
-                try {
-                  const parsed = JSON.parse(storedCoords); // ✅ JSON format
-                  lat = parsed.latitude;
-                  lng = parsed.longitude;
-                } catch (err) {
-                  // fallback for "lat,long" format
-                  if (storedCoords.includes(",")) {
-                    const [latStr, lngStr] = storedCoords.split(",");
-                    lat = parseFloat(latStr);
-                    lng = parseFloat(lngStr);
-                  }
-                }
-              }
-  
-              console.log("📡 Sending to backend:", lat, lng);
-  
-              const res = await fetch("http://localhost:5001/issues/fetch-address", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({ latitude, longitude }),
-              });
-  
-              const data = await res.json();
-              if (!res.ok) throw new Error(data.error || "Failed to fetch address");
-  
-              console.log("🏠 Address from backend:", data.address);
-              setAddress(data.address); // ✅ Store address in state
-            } catch (err) {
-              console.error("❌ Error fetching address:", err);
-              setAddress("Unable to fetch address"); // ✅ Set fallback address
-            } finally {
-              setAddressLoading(false); // ✅ Stop address loading
-            }
-          },
-          (err) => {
-            console.warn("⚠️ Geolocation error:", err.message);
-            setAddressLoading(false);
-          },
-          { enableHighAccuracy: true, timeout: 10000 }
-        );
-      } else {
-        console.warn("⚠️ Geolocation is not supported by this browser");
-      }
-    };
-  
-    fetchLocationAndAddress();
+    if (!navigator.geolocation) {
+      console.warn("⚠️ Geolocation not supported");
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        console.log("📍 Fetched coordinates:", latitude, longitude);
+
+        const coords = { latitude, longitude };
+        setCoordinates(coords);
+        localStorage.setItem("coords", JSON.stringify(coords));
+        console.log("✅ Coordinates saved:", coords);
+      },
+      (err) => {
+        console.warn("⚠️ Geolocation error:", err.message);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
   }, []);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
     setError("");
     setSuccess("");
   };
 
   const handleImageCapture = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.capture = 'environment';
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.capture = "environment";
     input.onchange = (e) => {
       const file = e.target.files[0];
       if (file) {
@@ -118,9 +65,9 @@ function ReportIssuePage() {
   };
 
   const handleImageSelect = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
     input.onchange = (e) => {
       const file = e.target.files[0];
       if (file) {
@@ -137,76 +84,106 @@ function ReportIssuePage() {
     setSelectedImage(null);
     setImagePreview(null);
   };
-  
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-    setSuccess("");
 
-    if (!formData.issue_title || !formData.issue_description) {
-      setError("All fields are required");
+  // --- Submit issue
+ // --- Submit issue
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setLoading(true);
+  setError("");
+  setSuccess("");
+
+  if (!formData.issue_title || !formData.issue_description) {
+    setError("All fields are required");
+    setLoading(false);
+    return;
+  }
+
+  try {
+    const token = localStorage.getItem("token");
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+
+    if (!token || !user?.id) {
+      setError("User is not logged in or token not found");
       setLoading(false);
       return;
     }
 
-    try {
-      const token = localStorage.getItem("token");
-      const user = JSON.parse(localStorage.getItem("user") || "{}");
+    const storedCoords = JSON.parse(localStorage.getItem("coords") || "{}");
 
-      if (!token || !user?.id) {
-        setError("User is not logged in or token not found");
-        setLoading(false);
-        return;
-      }
-
-      const storedCoords = JSON.parse(localStorage.getItem("coords") || "{}");
-
-      const payload = new FormData();
-      payload.append("issue_title", formData.issue_title);
-      payload.append("issue_description", formData.issue_description);
-      payload.append("created_by", user.id);
-      if (selectedImage) payload.append("photo", selectedImage);
-      if (storedCoords.latitude && storedCoords.longitude) {
-        payload.append("latitude", storedCoords.latitude);
-        payload.append("longitude", storedCoords.longitude);
-      }
-
-      // POST to /issues/create
-      const response = await fetch("http://localhost:5001/issues/create", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: payload,
-      });
-
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Issue submission failed");
-
-      // Classification (optional)
-      const classifyRes = await fetch("http://localhost:5001/issues/classify-report", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ reportId: data.issue.issue_id }),
-      });
-
-      const classifyData = await classifyRes.json();
-      if (!classifyRes.ok) throw new Error(classifyData.error || "Classification failed");
-
-      setSuccess(`Your report has been submitted to the ${classifyData.department} department.`);
-
-      // Reset form
-      setFormData({ issue_title: "", issue_description: "" });
-      setSelectedImage(null);
-      setImagePreview(null);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+    const payload = new FormData();
+    payload.append("issue_title", formData.issue_title);
+    payload.append("issue_description", formData.issue_description);
+    payload.append("created_by", user.id);
+    if (selectedImage) payload.append("photo", selectedImage);
+    if (storedCoords.latitude && storedCoords.longitude) {
+      payload.append("latitude", storedCoords.latitude);
+      payload.append("longitude", storedCoords.longitude);
     }
-  };
+
+    console.log("📡 Submitting /issues/create:", payload);
+
+    const response = await fetch("http://localhost:5001/issues/create", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: payload,
+    });
+
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Issue submission failed");
+
+    console.log("✅ /issues/create response:", data);
+
+    // --- Classification
+    const classifyRes = await fetch("http://localhost:5001/issues/classify-report", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ reportId: data.issue.issue_id }),
+    });
+
+    const classifyData = await classifyRes.json();
+    if (!classifyRes.ok) throw new Error(classifyData.error || "Classification failed");
+
+    console.log("📂 /issues/classify-report response:", classifyData);
+
+    // --- Fetch address from OpenCage (frontend)
+    let areaName = "unknown area";
+    try {
+      const openCageKey = "ceefcaa44fd14d259322d6c1000b06c3"; // or from .env
+      const coordsToUse = storedCoords.latitude
+        ? `${storedCoords.latitude},${storedCoords.longitude}`
+        : `${data.location.latitude},${data.location.longitude}`;
+
+      const geoRes = await fetch(
+        `https://api.opencagedata.com/geocode/v1/json?q=${coordsToUse}&key=${openCageKey}&no_annotations=1`
+      );
+      const geoData = await geoRes.json();
+      if (geoData?.results?.length > 0) {
+        const c = geoData.results[0].components;
+        areaName = c.suburb || c.neighbourhood || c.village || c.city || c.town || "your area";
+      }
+    } catch (geoErr) {
+      console.warn("⚠️ OpenCage fetch failed:", geoErr.message);
+    }
+
+    setSuccess(
+      `✅ Your report has been submitted to the ${classifyData.department} department at ${areaName}.`
+    );
+
+    // Reset form
+    setFormData({ issue_title: "", issue_description: "" });
+    setSelectedImage(null);
+    setImagePreview(null);
+  } catch (err) {
+    console.error("❌ Error submitting issue:", err);
+    setError(err.message);
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <PWALayout title="Report Issue" showNotifications={true}>
@@ -216,30 +193,18 @@ function ReportIssuePage() {
           <p className="text-gray-600">Help make your city better by reporting civic issues</p>
         </div>
 
-        {/* ✅ Enhanced Location Display */}
+        {/* Location & Coordinates */}
         {coordinates.latitude && coordinates.longitude && (
           <Card className="mb-6 border-blue-200 bg-blue-50">
             <CardContent>
               <div className="space-y-3">
-                {/* ✅ Address Section - Display above coordinates */}
                 <div className="flex items-start space-x-3">
                   <MapPin className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
                   <div className="flex-1">
                     <p className="text-sm font-medium text-gray-700 mb-1">Current Location</p>
-                    {addressLoading ? (
-                      <div className="flex items-center space-x-2">
-                        <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
-                        <p className="text-blue-700">Fetching address...</p>
-                      </div>
-                    ) : address ? (
-                      <p className="text-green-700 font-medium">{address}</p>
-                    ) : (
-                      <p className="text-gray-500">Address not available</p>
-                    )}
+                    <p className="text-green-700 font-medium">Address will be resolved by backend</p>
                   </div>
                 </div>
-                
-                {/* ✅ Coordinates Section - Display below address */}
                 <div className="flex items-center space-x-3 pt-2 border-t border-blue-200">
                   <MapPin className="w-5 h-5 text-blue-500 flex-shrink-0" />
                   <div className="flex-1">
@@ -254,6 +219,7 @@ function ReportIssuePage() {
           </Card>
         )}
 
+        {/* Error & Success */}
         {error && (
           <Card className="mb-6 border-red-200 bg-red-50">
             <CardContent className="p-4 flex items-center space-x-2">
@@ -262,7 +228,6 @@ function ReportIssuePage() {
             </CardContent>
           </Card>
         )}
-
         {success && (
           <Card className="mb-6 border-green-200 bg-green-50">
             <CardContent className="p-4 flex items-center space-x-2">
@@ -272,6 +237,7 @@ function ReportIssuePage() {
           </Card>
         )}
 
+        {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Issue Details */}
           <Card>

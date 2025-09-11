@@ -167,7 +167,7 @@ const getDeptIssues = async (req, res) => {
     // Fetch logged-in employee
     const { data: employee, error: empError } = await supabase
       .from("employee_registry")
-      .select("emp_id, emp_email, dept_name, team_name, position, issue_id, name")
+      .select("emp_id, emp_email, dept_name, team_name, position, name")
       .eq("emp_email", employeeEmail)
       .single();
 
@@ -183,6 +183,29 @@ const getDeptIssues = async (req, res) => {
 
       if (singleIssueError || !issue) return res.status(404).json({ error: "Issue not found" });
       return res.json({ issue });
+    }
+
+    // ---------------- EMPLOYEE ----------------
+    if (employee.position === 0) {
+      // Fetch all issues assigned to this employee from employee_issues_map
+      const { data: assignments, error: assignError } = await supabase
+        .from("employee_issue_map")
+        .select("issue_id")
+        .eq("emp_id", employee.emp_id);
+
+      if (assignError) return res.status(500).json({ error: assignError.message });
+
+      const issueIds = assignments.map(a => a.issue_id);
+      if (issueIds.length === 0) return res.json({ employee: employee.emp_email, issues: [] });
+
+      const { data: issues, error: issuesError } = await supabase
+        .from("issues")
+        .select("*")
+        .in("issue_id", issueIds);
+
+      if (issuesError) return res.status(500).json({ error: issuesError.message });
+
+      return res.json({ employee: employee.emp_email, issues });
     }
 
     // ---------------- MANAGER ----------------
@@ -258,9 +281,18 @@ const updateIssueStatus = async (req, res) => {
   if (!status) return res.status(400).json({ error: "Status is required" });
 
   try {
+    // 0️⃣ Get user info from request (assuming you have a middleware that sets req.user)
+    const user = req.user; // { emp_email, position, ... }
+    console.log("➡️ User trying to update status:", user);
+
+    // 1️⃣ Permission check: position 0 = regular employee
+    if (user.position === 0) {
+      return res.status(403).json({ error: "You are not allowed to update issue status" });
+    }
+
     console.log("➡️ Updating issue:", issueId, "with status:", status);
 
-    // 1️⃣ Update issue status
+    // 2️⃣ Update issue status in Supabase
     const { data, error } = await supabase
       .from("issues")
       .update({ status })
@@ -274,7 +306,7 @@ const updateIssueStatus = async (req, res) => {
     }
     console.log("✅ Updated issue:", data);
 
-    // 2️⃣ Fetch profile
+    // 3️⃣ Fetch user profile to send WhatsApp
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("name, phone")
@@ -286,7 +318,7 @@ const updateIssueStatus = async (req, res) => {
     }
     console.log("👤 Profile fetched:", profile);
 
-    // 3️⃣ Send WhatsApp
+    // 4️⃣ Send WhatsApp notification if phone exists
     if (profile?.phone) {
       const msg = `Hello ${profile.name},\n\nYour issue *${data.issue_title}* is now marked as *${status}*.\nCheck the app for details.`;
       console.log("📲 Sending WhatsApp to:", profile.phone, "message:", msg);
@@ -303,7 +335,6 @@ const updateIssueStatus = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
-
 
 
 const classifyReport = async (req, res) => {

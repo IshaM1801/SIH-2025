@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Users,
   FileText,
@@ -13,10 +13,12 @@ import {
   ChevronLeft,
   Map as MapIcon,
   ChevronRight,
+  LogOut,
 } from "lucide-react";
 
 const Sidebar = ({ adminData }) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(true);
 
   const getAdminName = () => {
@@ -40,19 +42,28 @@ const Sidebar = ({ adminData }) => {
     return "Administration";
   };
 
+  const handleLogout = () => {
+    // Clear auth data (adjust as per your auth system)
+    localStorage.removeItem("token");
+    localStorage.removeItem("adminData");
+
+    // Redirect to login page
+    navigate("/login");
+  };
+
   const sidebarItems = [
     { icon: FileText, label: "Report Management", path: "/reports" },
     {
       icon: Users,
-      label: "Citizen & Department Management",
+      label: "Citizen & Department ",
       path: "/citizens",
     },
     { icon: BarChart3, label: "Analytics", path: "/dashboard" },
-    { icon: MapIcon, label: "Map", path: "/map" }, // <-- New Map option
+    { icon: MapIcon, label: "Map", path: "/map" },
     { icon: Sliders, label: "Issue Categories Setup", path: "/categories" },
     {
       icon: GitBranch,
-      label: "AI agent efficiency calculator",
+      label: "AI efficiency calculator",
       path: "/ai-efficiency",
     },
     { icon: RefreshCw, label: "Task Routing Module", path: "/task-routing" },
@@ -68,18 +79,18 @@ const Sidebar = ({ adminData }) => {
   return (
     <div
       className={`${
-        isOpen ? "w-85" : "w-20"
-      } bg-white border-r border-gray-200 flex-shrink-0 shadow-sm transition-all duration-300 `}
+        isOpen ? "w-70 " : "w-20 h-250"
+      } bg-white border-r border-gray-200 flex-shrink-0 shadow-sm transition-all duration-300 flex flex-col  justify-between`}
     >
       <div className="p-4">
         {/* Sidebar Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="border-b pb-3 border-gray-200 flex items-center justify-between mb-4">
           {isOpen && (
-            <h1 className="text-xl font-semibold text-gray-900">Dashboard</h1>
+            <h1 className="text-xl font-semibold text-gray-900">FixMyCity</h1>
           )}
           <button
             onClick={() => setIsOpen(!isOpen)}
-            className="p-2 rounded-lg hover:bg-gray-100"
+            className=" p-2 ml-1 rounded-lg hover:bg-gray-100"
           >
             {isOpen ? (
               <ChevronLeft className="w-5 h-5 text-gray-600" />
@@ -111,26 +122,48 @@ const Sidebar = ({ adminData }) => {
               )}
             </Link>
           ))}
-        </nav>
-
-        {/* Admin Info */}
-        <div className="mt-8 flex items-center space-x-3">
-          <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
-            <span className="text-white text-sm font-semibold">
-              {getAdminInitials()}
-            </span>
-          </div>
-          {isOpen && (
-            <div className="block min-w-0">
-              <div className="text-sm font-medium text-gray-900 truncate">
-                {getAdminName()}
-              </div>
-              <div className="text-xs text-gray-500 truncate">
-                {getAdminRole()}
-              </div>
+          {/* Admin Info + Logout */}
+          <div className=" mt-2 pt-3 border-t border-gray-200">
+            <div className="flex items-center space-x-3 mb-2  mr-2">
+              {isOpen ? (
+                <div className="flex p-2">
+                  <div className="mr-5 w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <span className="text-white text-sm font-semibold">
+                      {getAdminInitials()}
+                    </span>
+                  </div>
+                  <div className="block min-w-0">
+                    <div className="text-sm font-medium text-gray-900 truncate">
+                      {getAdminName()}
+                    </div>
+                    <div className="text-xs text-gray-500 truncate">
+                      {getAdminRole()}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-1 pt-2 pr-3">
+                  <div className=" w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <span className="text-white text-sm font-semibold">
+                      {getAdminInitials()}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+
+            {/* Logout Button */}
+            <button
+              onClick={handleLogout}
+              className={`flex items-center w-full px-2 py-2 pl-4  rounded-lg text-red-600 hover:bg-red-50 transition`}
+            >
+              <LogOut className="w-5 h-5" />
+              {isOpen && (
+                <span className="mr-5 ml-2 text-sm font-medium">Logout</span>
+              )}
+            </button>
+          </div>
+        </nav>
       </div>
     </div>
   );

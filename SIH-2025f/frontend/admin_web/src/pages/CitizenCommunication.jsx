@@ -212,7 +212,7 @@ const IssueModal = ({ issue, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex justify-center items-center p-4 animate-in fade-in-0 duration-300">
+    <div className="fixed inset-0 mt-0 pt-0 bg-black/50 z-50 flex justify-center items-center p-4 animate-in fade-in-0 duration-300">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="bg-blue-600 text-white p-6 relative">
@@ -509,7 +509,7 @@ const CitizenCommunication = () => {
 
   return (
     <div className="bg-gray-50 min-h-screen font-sans">
-      <main className="container mx-auto px-6 py-8">
+      <main className="container mx-auto">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6">
           <h2 className="text-3xl font-bold text-gray-800 mb-4 sm:mb-0">
             Community Reports

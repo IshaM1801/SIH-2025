@@ -330,16 +330,16 @@ const ReportManagementPage = () => {
                       )}
                     </div>
 
-                    <span
+                    {/* <span
                       className={`px-2 py-1 text-xs font-medium rounded-full ring-1 ${
                         priorityStyles[report.priority] ||
                         "bg-gray-100 text-gray-600"
                       }`}
                     >
                       {report.priority}
-                    </span>
+                    </span> */}
                     <span className="text-sm text-gray-500">
-                      {getRelativeDate(report.date_created)}
+                      {getRelativeDate(report.created_at)}
                     </span>
                   </div>
                 </li>

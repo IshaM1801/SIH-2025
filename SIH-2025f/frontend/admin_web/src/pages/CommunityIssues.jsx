@@ -412,7 +412,7 @@ const Comments = ({ issueId }) => {
     }
 
     try {
-      await axiosInstance.delete(`/issues/comments/${commentId}`);
+      await axiosInstance.delete(`/comments/issues/comments/${commentId}`);
       setComments((prev) =>
         prev.filter((comment) => comment.comment_id !== commentId)
       );

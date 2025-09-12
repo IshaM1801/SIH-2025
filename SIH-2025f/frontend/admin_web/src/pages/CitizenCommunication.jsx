@@ -15,6 +15,7 @@ import {
   Upload,
   Shield,
   Trash2,
+  Edit2Icon,
 } from "lucide-react";
 
 import axios from "axios";
@@ -282,6 +283,17 @@ const CommentItem = ({ comment, currentUser, onDelete, onEdit }) => {
             <Trash2 size={14} />
           </button>
         )}
+
+        {/* --- MODIFIED EDIT BUTTON LOGIC --- */}
+        {/* {canEdit() && (
+          <button
+            onClick={() => onEdit(comment.comment_id)}
+            className="text-blue-500 hover:text-blue-700 opacity-70 hover:opacity-100"
+            title="Edit comment"
+          >
+            <Edit2Icon size={14} />
+          </button>
+        )} */}
       </div>
 
       <p className="text-gray-700 text-sm mb-2">{comment.content}</p>
@@ -412,13 +424,35 @@ const Comments = ({ issueId }) => {
     }
 
     try {
-      await axiosInstance.delete(`/issues/comments/${commentId}`);
+      await axiosInstance.delete(`/comments/issues/comments/${commentId}`);
       setComments((prev) =>
         prev.filter((comment) => comment.comment_id !== commentId)
       );
     } catch (err) {
       setError("Failed to delete comment.");
       console.error("Error deleting comment:", err);
+    }
+  };
+
+  const handleEditComment = async (commentId) => {
+    if (!window.confirm("Are you sure you want to edit this comment?")) {
+      return;
+    }
+
+    try {
+      await axiosInstance.put(`/comments/issues/comments/${commentId}`, {
+        content: newComment.trim(),
+      });
+      setComments((prev) =>
+        prev.map((comment) =>
+          comment.comment_id === commentId
+            ? { ...comment, content: newComment.trim() }
+            : comment
+        )
+      );
+    } catch (err) {
+      setError("Failed to edit comment.");
+      console.error("Error editing comment:", err);
     }
   };
 
@@ -439,6 +473,7 @@ const Comments = ({ issueId }) => {
               comment={comment}
               currentUser={currentUser}
               onDelete={handleDeleteComment}
+              onEdit={handleEditComment}
             />
           ))
         ) : (

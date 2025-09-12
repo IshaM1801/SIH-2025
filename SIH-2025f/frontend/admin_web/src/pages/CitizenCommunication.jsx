@@ -201,7 +201,6 @@ const Comments = ({ issueId }) => {
 const IssueModal = ({ issue, onClose }) => {
   const [upvotes, setUpvotes] = useState(issue?.upvotes || 0);
   const [copied, setCopied] = useState(false);
-
   if (!issue) return null;
 
   const copyCoordinates = (value) => {
@@ -311,7 +310,7 @@ const IssueModal = ({ issue, onClose }) => {
                       Severity Level
                     </span>
                   </div>
-                  <SeverityBadge severity={issue.severity || "high"} />
+                  <SeverityBadge severity={issue.priority || "high"} />
                 </div>
 
                 <div>

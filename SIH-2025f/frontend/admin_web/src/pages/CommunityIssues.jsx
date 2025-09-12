@@ -380,10 +380,13 @@ const Comments = ({ issueId }) => {
         console.log("URL received from image upload:", imageUrl);
       }
       // The backend will figure out if the user is an employee from the token
-      const response = await axiosInstance.post(`/issues/comments/${issueId}`, {
-        content: newComment.trim(),
-        image_url: imageUrl,
-      });
+      const response = await axiosInstance.post(
+        `/comments/issues/comments/${issueId}`,
+        {
+          content: newComment.trim(),
+          image_url: imageUrl,
+        }
+      );
 
       // Just add the new comment to the top and re-sort
       setComments((prev) =>

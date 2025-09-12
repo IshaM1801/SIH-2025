@@ -24,7 +24,7 @@ const API_BASE_URL = "http://localhost:5001";
 const getAuthToken = () => {
   // For demonstration, we'll try to get it from localStorage.
   // Replace 'fixmycity_token' with the key you use to store the JWT after login.
-  return localStorage.getItem("token");
+  return localStorage.getItem("employee_token");
 };
 
 const axiosInstance = axios.create({
@@ -444,7 +444,7 @@ const CitizenCommunication = () => {
   const [selectedIssue, setSelectedIssue] = useState(null);
   const [statusFilter, setStatusFilter] = useState("all");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-
+  const token = getAuthToken();
   useEffect(() => {
     // Simple check for token to conditionally render UI elements
     const token = getAuthToken();
@@ -454,24 +454,37 @@ const CitizenCommunication = () => {
   }, []);
 
   const fetchIssues = useCallback(async () => {
-    setIsLoading(true);
-    setError("");
     try {
-      const response = await axiosInstance.get("/issues");
-      setIssues(response.data.issues);
+      setIsLoading(true);
+      const res = await fetch("http://localhost:5001/issues/dept", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const data = await res.json();
+
+      // 🔹 Flatten all issues from all team members
+      const allIssues = data.team.flatMap((member) => member.issues);
+
+      // Remove duplicates by issue_id
+      const uniqueIssuesMap = {};
+      allIssues.forEach((issue) => {
+        if (!uniqueIssuesMap[issue.issue_id]) {
+          uniqueIssuesMap[issue.issue_id] = issue;
+        }
+      });
+
+      const uniqueIssues = Object.values(uniqueIssuesMap);
+      console.log(uniqueIssues);
+
+      setIssues(uniqueIssues); // ✅ keep this only
     } catch (err) {
-      if (err.response?.status === 401) {
-        setError(
-          "You are not logged in. Please log in to view and post issues."
-        );
-        setIsLoggedIn(false);
-      } else {
-        setError("Failed to fetch issues. The server might be down.");
-      }
+      console.error("Error fetching issues:", err);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [token]);
 
   useEffect(() => {
     fetchIssues();

@@ -1,4 +1,4 @@
-require("dotenv").config();//.
+require("dotenv").config(); //.
 const jwt = require("jsonwebtoken");
 const { createClient } = require("@supabase/supabase-js");
 
@@ -12,7 +12,8 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 const register = async (req, res) => {
   const { email, password } = req.body;
 
-  if (!email || !password) return res.status(400).json({ error: "Missing fields" });
+  if (!email || !password)
+    return res.status(400).json({ error: "Missing fields" });
 
   try {
     const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -26,7 +27,8 @@ const register = async (req, res) => {
     if (authError) return res.status(400).json({ error: authError.message });
 
     res.json({
-      message: "✅ Verification email sent! Check your inbox to verify your email.",
+      message:
+        "✅ Verification email sent! Check your inbox to verify your email.",
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -50,7 +52,8 @@ const login = async (req, res) => {
 
       if (empError) return res.status(500).json({ error: empError.message });
 
-      if (!empData) return res.status(401).json({ error: "Employee not found." });
+      if (!empData)
+        return res.status(401).json({ error: "Employee not found." });
 
       if (empData.password !== password)
         return res.status(401).json({ error: "Invalid password" });
@@ -64,7 +67,7 @@ const login = async (req, res) => {
 
       return res.json({
         message: `✅ Welcome ${empData.name} to the Department of ${empData.dept_name}`,
-        access_token: empToken,     // employee token
+        access_token: empToken, // employee token
         employee: empData,
         type: "employee",
       });
@@ -72,10 +75,11 @@ const login = async (req, res) => {
 
     // 2️⃣ User login via Supabase
     if (role === "user") {
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const { data: authData, error: authError } =
+        await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
 
       if (authError) return res.status(401).json({ error: authError.message });
       if (!authData) return res.status(401).json({ error: "User not found" });
@@ -89,7 +93,6 @@ const login = async (req, res) => {
     }
 
     return res.status(400).json({ error: "Invalid role" });
-
   } catch (err) {
     console.error("Login error:", err);
     res.status(500).json({ error: "Server error", details: err.message });
@@ -102,7 +105,8 @@ module.exports = { login };
 const verifyEmail = async (req, res) => {
   const { access_token } = req.query; // Supabase sends this token in the confirmation link
 
-  if (!access_token) return res.status(400).json({ error: "Missing access token" });
+  if (!access_token)
+    return res.status(400).json({ error: "Missing access token" });
 
   try {
     // Exchange the access_token for a session
@@ -111,7 +115,8 @@ const verifyEmail = async (req, res) => {
     });
 
     if (error) return res.status(400).json({ error: error.message });
-    if (!data?.session) return res.status(401).json({ error: "Invalid or expired token" });
+    if (!data?.session)
+      return res.status(401).json({ error: "Invalid or expired token" });
 
     // ✅ Return session info to frontend
     res.json({
@@ -125,7 +130,6 @@ const verifyEmail = async (req, res) => {
   }
 };
 
-
 // ------------------ PASSWORD RESET ------------------
 const requestPasswordReset = async (req, res) => {
   const { email } = req.body;
@@ -133,7 +137,9 @@ const requestPasswordReset = async (req, res) => {
 
   try {
     const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: process.env.PASSWORD_RESET_REDIRECT || process.env.FRONTEND_URL + "/reset-password",
+      redirectTo:
+        process.env.PASSWORD_RESET_REDIRECT ||
+        process.env.FRONTEND_URL + "/reset-password",
     });
 
     if (error) return res.status(400).json({ error: error.message });
@@ -147,10 +153,13 @@ const requestPasswordReset = async (req, res) => {
 // ------------------ UPDATE PASSWORD ------------------
 const updatePassword = async (req, res) => {
   const { newPassword } = req.body;
-  if (!newPassword) return res.status(400).json({ error: "Missing new password" });
+  if (!newPassword)
+    return res.status(400).json({ error: "Missing new password" });
 
   try {
-    const { data, error } = await supabase.auth.updateUser({ password: newPassword });
+    const { data, error } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
     if (error) return res.status(400).json({ error: error.message });
 
     res.json({ message: "Password updated successfully!" });
@@ -161,7 +170,8 @@ const updatePassword = async (req, res) => {
 // ------------------ COMPLETE PROFILE AFTER VERIFICATION ------------------
 const completeProfile = async (req, res) => {
   const { name, phone } = req.body;
-  if (!name || !phone) return res.status(400).json({ error: "Missing name or phone" });
+  if (!name || !phone)
+    return res.status(400).json({ error: "Missing name or phone" });
 
   const user = req.user;
   if (!user) return res.status(401).json({ error: "Unauthorized" });
@@ -181,13 +191,13 @@ const completeProfile = async (req, res) => {
       .select()
       .single();
 
-    if (profileError) return res.status(400).json({ error: profileError.message });
+    if (profileError)
+      return res.status(400).json({ error: profileError.message });
 
     res.json({
       message: "Profile created successfully!",
       profile: profileData,
     });
-
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

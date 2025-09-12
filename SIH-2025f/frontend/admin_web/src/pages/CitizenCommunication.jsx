@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   MapPin,
   User,
@@ -11,19 +11,18 @@ import {
   Clock,
   CheckCircle,
   XCircle,
+  Image as ImageIcon,
+  Upload,
+  Shield,
+  Trash2,
 } from "lucide-react";
 
 import axios from "axios";
-
+import { jwtDecode } from "jwt-decode";
 // --- Configuration ---
-// Make sure your backend is running on this port.
 const API_BASE_URL = "http://localhost:5001";
 
-// --- Helper Function to get Auth Token ---
-// In a real app, this would come from your auth context or a secure storage.
 const getAuthToken = () => {
-  // For demonstration, we'll try to get it from localStorage.
-  // Replace 'fixmycity_token' with the key you use to store the JWT after login.
   return localStorage.getItem("employee_token");
 };
 
@@ -43,6 +42,23 @@ axiosInstance.interceptors.request.use(
     return Promise.reject(error);
   }
 );
+
+const getCurrentUser = () => {
+  const token = getAuthToken();
+  if (!token) return null;
+  try {
+    const decoded = jwtDecode(token);
+    // From your authMiddleware, we know employees have 'email' and users will have 'sub' (for user_id)
+    return {
+      isEmployee: decoded.role === "employee",
+      id: decoded.sub, // For Supabase JWT, user ID is in 'sub' claim
+      email: decoded.email,
+    };
+  } catch (e) {
+    console.error("Invalid token:", e);
+    return null;
+  }
+};
 
 // Status configuration
 const STATUS_CONFIG = {
@@ -113,20 +129,212 @@ const SeverityBadge = ({ severity }) => {
   );
 };
 
+// Image Upload Component
+const ImageUpload = ({ onImageSelect, selectedImage, onRemoveImage }) => {
+  const fileInputRef = useRef(null);
+
+  const handleFileSelect = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith("image/")) {
+        alert("Please select an image file");
+        return;
+      }
+
+      // Validate file size (5MB limit)
+      if (file.size > 5 * 1024 * 1024) {
+        alert("Image size should be less than 5MB");
+        return;
+      }
+
+      onImageSelect(file);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2 mt-2">
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileSelect}
+        accept="image/*"
+        className="hidden"
+      />
+
+      {selectedImage ? (
+        <div className="flex items-center gap-2 bg-blue-50 px-3 py-2 rounded-lg border border-blue-200">
+          <ImageIcon size={16} className="text-blue-600" />
+          <span className="text-sm text-blue-700 truncate max-w-32">
+            {selectedImage.name}
+          </span>
+          <button
+            onClick={onRemoveImage}
+            className="text-red-500 hover:text-red-700 ml-1"
+            type="button"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          type="button"
+          className="flex items-center gap-2 px-3 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+        >
+          <Upload size={16} />
+          <span className="text-sm">Add Image</span>
+        </button>
+      )}
+    </div>
+  );
+};
+
+// Comment Component
+const CommentItem = ({ comment, currentUser, onDelete, onEdit }) => {
+  // Added currentUser and onEdit
+  const isEmployeeComment = !!comment.employee_id;
+  const [imageError, setImageError] = useState(false);
+
+  const canDelete = () => {
+    if (!currentUser) return false;
+    // An employee can delete any user's comment
+    if (currentUser.isEmployee && !isEmployeeComment) {
+      return true;
+    }
+    // Anyone can delete their own comment
+    if (
+      currentUser.isEmployee &&
+      currentUser.email === comment.employee_registry?.emp_email
+    ) {
+      // This check is a bit tricky without the email in the payload. Let's rely on employee_id.
+      // A better approach is to have the backend return the employee_id and user_id directly.
+      // Let's assume the main delete logic is on the backend. Here we handle the UI.
+      return isEmployeeComment;
+    }
+    if (!currentUser.isEmployee && currentUser.id === comment.user_id) {
+      return true;
+    }
+    return false;
+  };
+
+  const canEdit = () => {
+    if (!currentUser) return false;
+    // An employee can edit any user's comment
+    if (currentUser.isEmployee && !isEmployeeComment) {
+      return true;
+    }
+    // Anyone can edit their own comment
+    if (
+      currentUser.isEmployee &&
+      currentUser.email === comment.employee_registry?.emp_email
+    ) {
+      // This check is a bit tricky without the email in the payload. Let's rely on employee_id.
+      // A better approach is to have the backend return the employee_id and user_id directly.
+      // Let's assume the main delete logic is on the backend. Here we handle the UI.
+      return isEmployeeComment;
+    }
+    if (!currentUser.isEmployee && currentUser.id === comment.user_id) {
+      return true;
+    }
+    return false;
+  };
+
+  return (
+    <div
+      className={`p-4 rounded-lg border-l-4 ${
+        isEmployeeComment
+          ? "bg-blue-50 border-l-blue-500 border border-blue-200"
+          : "bg-gray-100 border-l-gray-400"
+      }`}
+    >
+      <div className="flex justify-between items-start mb-2">
+        <div className="flex items-center gap-2">
+          <p
+            className={`font-bold text-sm ${
+              isEmployeeComment ? "text-blue-800" : "text-gray-800"
+            }`}
+          >
+            {comment.commenter_name || "Anonymous"}
+          </p>
+          {isEmployeeComment && (
+            <div className="flex items-center gap-1 bg-blue-100 px-2 py-1 rounded-full">
+              <Shield size={12} className="text-blue-600" />
+              <span className="text-xs font-medium text-blue-700">
+                Official
+              </span>
+            </div>
+          )}
+          {comment.employee_registry?.dept_name && (
+            <span className="text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded">
+              {comment.employee_registry.dept_name}
+            </span>
+          )}
+        </div>
+
+        {/* --- MODIFIED DELETE BUTTON LOGIC --- */}
+        {canDelete() && (
+          <button
+            onClick={() => onDelete(comment.comment_id)}
+            className="text-red-500 hover:text-red-700 opacity-70 hover:opacity-100"
+            title="Delete comment"
+          >
+            <Trash2 size={14} />
+          </button>
+        )}
+      </div>
+
+      <p className="text-gray-700 text-sm mb-2">{comment.content}</p>
+
+      {comment.image_url && !imageError && (
+        <div className="mb-2">
+          <img
+            src={comment.image_url}
+            alt="Comment attachment"
+            className="max-w-64 max-h-48 rounded-lg border cursor-pointer hover:opacity-90 transition-opacity"
+            onError={() => setImageError(true)}
+            onClick={() => window.open(comment.image_url, "_blank")}
+          />
+        </div>
+      )}
+
+      <p className="text-xs text-gray-500">
+        {new Date(comment.created_at).toLocaleString()}
+      </p>
+    </div>
+  );
+};
+
+// Enhanced Comments Component
 const Comments = ({ issueId }) => {
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
+  const [selectedImage, setSelectedImage] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+
+  // Get current user info once
+  const currentUser = getCurrentUser();
+  const isAdmin = currentUser?.isEmployee;
 
   const fetchComments = useCallback(async () => {
     setIsLoading(true);
     try {
-      // ✅ Corrected URL
       const response = await axiosInstance.get(`/issues/comments/${issueId}`);
-      setComments(response.data);
+      // Sort comments: Employee comments first, then by creation date
+      const sortedComments = response.data.sort((a, b) => {
+        const aIsAdmin = !!a.employee_id;
+        const bIsAdmin = !!b.employee_id;
+        if (aIsAdmin && !bIsAdmin) return -1;
+        if (!aIsAdmin && bIsAdmin) return 1;
+        return new Date(b.created_at) - new Date(a.created_at);
+      });
+      setComments(sortedComments);
+      setError("");
     } catch (err) {
       setError("Failed to load comments.");
+      console.error("Error fetching comments:", err);
     } finally {
       setIsLoading(false);
     }
@@ -136,18 +344,81 @@ const Comments = ({ issueId }) => {
     fetchComments();
   }, [fetchComments]);
 
+  const uploadImage = async (file) => {
+    const formData = new FormData();
+    formData.append("image", file);
+
+    try {
+      const response = await axiosInstance.post(
+        "comments/upload/comment-image",
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+      return response.data.imageUrl;
+    } catch (error) {
+      console.error("Error uploading image:", error);
+      throw new Error("Failed to upload image");
+    }
+  };
+
   const handleCommentSubmit = async (e) => {
     e.preventDefault();
-    if (!newComment.trim()) return;
+    if (!newComment.trim() && !selectedImage) {
+      setError("Please enter a comment or select an image");
+      return;
+    }
+    setIsSubmitting(true);
+    setError("");
     try {
-      // ✅ Corrected URL
+      let imageUrl = null;
+      if (selectedImage) {
+        imageUrl = await uploadImage(selectedImage);
+        console.log("URL received from image upload:", imageUrl);
+      }
+      // The backend will figure out if the user is an employee from the token
       const response = await axiosInstance.post(`/issues/comments/${issueId}`, {
-        content: newComment,
+        content: newComment.trim(),
+        image_url: imageUrl,
       });
-      setComments([...comments, response.data]);
+
+      // Just add the new comment to the top and re-sort
+      setComments((prev) =>
+        [response.data, ...prev].sort((a, b) => {
+          const aIsAdmin = !!a.employee_id;
+          const bIsAdmin = !!b.employee_id;
+          if (aIsAdmin && !bIsAdmin) return -1;
+          if (!aIsAdmin && bIsAdmin) return 1;
+          return new Date(b.created_at) - new Date(a.created_at);
+        })
+      );
+
       setNewComment("");
+      setSelectedImage(null);
     } catch (err) {
-      setError("Failed to post comment.");
+      setError("Failed to post comment. Please try again.");
+      console.error("Error posting comment:", err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteComment = async (commentId) => {
+    if (!window.confirm("Are you sure you want to delete this comment?")) {
+      return;
+    }
+
+    try {
+      await axiosInstance.delete(`/issues/comments/${commentId}`);
+      setComments((prev) =>
+        prev.filter((comment) => comment.comment_id !== commentId)
+      );
+    } catch (err) {
+      setError("Failed to delete comment.");
+      console.error("Error deleting comment:", err);
     }
   };
 
@@ -155,43 +426,75 @@ const Comments = ({ issueId }) => {
 
   return (
     <div className="mt-6">
-      <h3 className="text-xl font-bold mb-4 text-gray-800">Comments</h3>
-      <div className="space-y-4 mb-6 max-h-60 overflow-y-auto pr-2">
+      <h3 className="text-xl font-bold mb-4 text-gray-800 flex items-center gap-2">
+        <MessageSquare size={20} />
+        Comments ({comments.length})
+      </h3>
+
+      <div className="space-y-4 mb-6 max-h-96 overflow-y-auto pr-2">
         {comments.length > 0 ? (
           comments.map((comment) => (
-            <div
+            <CommentItem
               key={comment.comment_id}
-              className="bg-gray-100 p-3 rounded-lg"
-            >
-              <p className="font-bold text-gray-800">
-                {comment.profiles?.name || "Anonymous"}
-              </p>
-              <p className="text-gray-700">{comment.content}</p>
-              <p className="text-xs text-gray-500 mt-1">
-                {new Date(comment.created_at).toLocaleString()}
-              </p>
-            </div>
+              comment={comment}
+              currentUser={currentUser}
+              onDelete={handleDeleteComment}
+            />
           ))
         ) : (
-          <p className="text-gray-500">
-            No comments yet. Be the first to comment!
-          </p>
+          <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+            <MessageSquare className="mx-auto mb-2 text-gray-400" size={32} />
+            <p className="text-gray-500">
+              No comments yet. Be the first to comment!
+            </p>
+          </div>
         )}
       </div>
-      <form onSubmit={handleCommentSubmit}>
-        <textarea
-          value={newComment}
-          onChange={(e) => setNewComment(e.target.value)}
-          className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="Add a comment..."
-          rows="2"
-        ></textarea>
-        {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+
+      <form onSubmit={handleCommentSubmit} className="space-y-3">
+        <div>
+          <textarea
+            value={newComment}
+            onChange={(e) => setNewComment(e.target.value)}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+            placeholder={`Add a ${isAdmin ? "response" : "comment"}...`}
+            rows="3"
+            disabled={isSubmitting}
+          />
+
+          <ImageUpload
+            onImageSelect={setSelectedImage}
+            selectedImage={selectedImage}
+            onRemoveImage={() => setSelectedImage(null)}
+          />
+        </div>
+
+        {error && (
+          <div className="text-red-600 text-sm bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+            {error}
+          </div>
+        )}
+
         <button
           type="submit"
-          className="mt-2 bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition duration-300"
+          disabled={isSubmitting || (!newComment.trim() && !selectedImage)}
+          className={`flex items-center gap-2 font-medium py-3 px-6 rounded-lg transition duration-300 ${
+            isAdmin
+              ? "bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-400"
+              : "bg-green-600 text-white hover:bg-green-700 disabled:bg-green-400"
+          } disabled:cursor-not-allowed`}
         >
-          Post Comment
+          {isSubmitting ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+              Posting...
+            </>
+          ) : (
+            <>
+              <MessageSquare size={16} />
+              {isAdmin ? "Post Response" : "Post Comment"}
+            </>
+          )}
         </button>
       </form>
     </div>
@@ -339,7 +642,7 @@ const IssueModal = ({ issue, onClose }) => {
                 </div>
               )}
 
-              <Comments issueId={issue.issue_id} />
+              <Comments issueId={issue.issue_id} isAdmin={true} />
             </div>
 
             {/* Location Details Sidebar */}
@@ -444,8 +747,8 @@ const CitizenCommunication = () => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const token = getAuthToken();
+
   useEffect(() => {
-    // Simple check for token to conditionally render UI elements
     const token = getAuthToken();
     if (token) {
       setIsLoggedIn(true);
@@ -462,11 +765,8 @@ const CitizenCommunication = () => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       const data = await res.json();
-
-      // 🔹 Flatten all issues from all team members
       const allIssues = data.team.flatMap((member) => member.issues);
 
-      // Remove duplicates by issue_id
       const uniqueIssuesMap = {};
       allIssues.forEach((issue) => {
         if (!uniqueIssuesMap[issue.issue_id]) {
@@ -475,9 +775,7 @@ const CitizenCommunication = () => {
       });
 
       const uniqueIssues = Object.values(uniqueIssuesMap);
-      console.log(uniqueIssues);
-
-      setIssues(uniqueIssues); // ✅ keep this only
+      setIssues(uniqueIssues);
     } catch (err) {
       console.error("Error fetching issues:", err);
     } finally {
@@ -488,11 +786,6 @@ const CitizenCommunication = () => {
   useEffect(() => {
     fetchIssues();
   }, [fetchIssues]);
-
-  const handleIssueCreated = (newIssue) => {
-    // To show the newly created issue immediately, refetch the list.
-    fetchIssues();
-  };
 
   const filteredIssues =
     statusFilter === "all"
@@ -509,13 +802,12 @@ const CitizenCommunication = () => {
 
   return (
     <div className="bg-gray-50 min-h-screen font-sans">
-      <main className="container mx-auto">
+      <main className="container mx-auto p-6">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6">
           <h2 className="text-3xl font-bold text-gray-800 mb-4 sm:mb-0">
             Community Reports
           </h2>
 
-          {/* Status Filter */}
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setStatusFilter("all")}

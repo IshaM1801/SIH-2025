@@ -126,9 +126,16 @@ const Navbar = ({ adminData }) => {
   }, []);
 
   return (
-    <div className="bg-white border-b border-gray-200 px-6 py-4 shadow-sm">
+    <div className="bg-white border-b border-gray-200 px-6 py-4 shadow-sm  ">
       <div className="flex items-center justify-between gap-6">
         {/* Left Side */}
+        <div>
+          <img
+            src="../../../public/icons/Emblem_of_India.png"
+            alt="Jharkhand Logo"
+            className="h-15"
+          />
+        </div>
         <div className="flex-shrink-0">
           <h1 className="text-xl font-bold text-gray-800">{getGreeting()}</h1>
           <p className="text-sm text-gray-500">

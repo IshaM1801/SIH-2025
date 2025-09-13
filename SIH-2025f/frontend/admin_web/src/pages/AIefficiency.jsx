@@ -57,13 +57,19 @@ const AIefficiency = () => {
             {Object.entries(data.summary_by_manager).map(([email, stats]) => {
               const efficiency =
                 stats.total_issues > 0
-                  ? (((stats.total_issues - stats.idle_issues) / stats.total_issues) * 100).toFixed(1)
+                  ? (
+                      ((stats.total_issues - stats.idle_issues) /
+                        stats.total_issues) *
+                      100
+                    ).toFixed(1)
                   : 100;
               return (
                 <tr key={email}>
                   <td className="border p-2">{email}</td>
                   <td className="border p-2 text-right">{stats.idle_issues}</td>
-                  <td className="border p-2 text-right">{stats.total_issues}</td>
+                  <td className="border p-2 text-right">
+                    {stats.total_issues}
+                  </td>
                   <td className="border p-2 text-right">{efficiency}</td>
                 </tr>
               );
@@ -74,10 +80,10 @@ const AIefficiency = () => {
 
       {/* Idle Issues */}
       <div className="bg-yellow-50 p-4 rounded shadow">
-      <h3 className="font-semibold mb-2">Idle Issues (&gt; 30 days)</h3>
+        <h3 className="font-semibold mb-2">Idle Issues (&gt; 30 days)</h3>
         {data.idle_issues.length === 0 ? (
           <div>No idle issues found.</div>
-         ) : (
+        ) : (
           <table className="w-full border-collapse border border-gray-300">
             <thead>
               <tr className="bg-yellow-100">

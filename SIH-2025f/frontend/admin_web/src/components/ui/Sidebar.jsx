@@ -1,27 +1,28 @@
-import React, { useState } from "react";
+import React from "react"; // No longer needs useState
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Users,
   FileText,
   BarChart3,
   Sliders,
-  GitBranch, // Consider: Cpu or BrainCircuit
-  ArrowRightLeft, // Changed from RefreshCw for better context
+  GitBranch,
+  ArrowRightLeft,
   ShieldAlert,
-  Activity,
   MessageSquare,
   ChevronLeft,
   Map as MapIcon,
   ChevronRight,
   LogOut,
-  Settings, // Added for Configuration group
-  LineChart, // Added for Monitoring group
+  LineChart,
 } from "lucide-react";
 
-const Sidebar = ({ adminData }) => {
+// 1. Component now accepts isOpen and setIsOpen as props from the Layout
+const Sidebar = ({ adminData, isOpen, setIsOpen }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const [isOpen, setIsOpen] = useState(true);
+
+  // 2. The internal state for isOpen has been REMOVED from this component.
+  // const [isOpen, setIsOpen] = useState(true); // <-- This line is deleted.
 
   const getAdminName = () => {
     if (adminData?.name) return adminData.name;
@@ -50,7 +51,6 @@ const Sidebar = ({ adminData }) => {
     navigate("/login");
   };
 
-  // --- NEW: Grouped sidebar items data structure ---
   const groupedSidebarItems = [
     {
       title: "Workspace",
@@ -108,16 +108,29 @@ const Sidebar = ({ adminData }) => {
     <div
       className={`${
         isOpen ? "w-72" : "w-20"
-      } bg-white border-r border-gray-200 flex flex-col shadow-sm transition-all duration-300 h-screen`}
+      } bg-white border-r border-gray-200 flex flex-col shadow-sm transition-all duration-300 h-screen fixed top-0 left-0 z-50`}
     >
       {/* Sidebar Header */}
-      <div className="p-4  border-gray-200 flex-shrink-0">
+      <div className="p-4 pb-1 border-gray-200 flex-shrink-0">
         <div className="flex items-center justify-between">
           {isOpen && (
-            <h1 className="text-xl font-bold text-gray-800 tracking-tight">
-              FixMyCity
-            </h1>
+            <div className="flex items-center space-x-3">
+              <img
+                src="/icons/jharkhand-logo.png"
+                alt="Jharkhand Logo"
+                className=" h-15 rounded-lg object-cover"
+              />
+              <div className="flex flex-col">
+                <h1 className="text-xl font-bold text-gray-800 tracking-tight">
+                  Government Of
+                </h1>
+                <h1 className="text-xl pl-5 font-bold text-gray-800 tracking-tight">
+                  Jharkhand
+                </h1>
+              </div>
+            </div>
           )}
+          {/* 3. This button now uses the setIsOpen prop to change the state in the parent Layout component */}
           <button
             onClick={() => setIsOpen(!isOpen)}
             className="p-2 ml-2 rounded-lg hover:bg-gray-100"
@@ -131,9 +144,8 @@ const Sidebar = ({ adminData }) => {
         </div>
       </div>
 
-      {/* Navigation - now scrollable */}
-      <nav className="flex-grow p-4 space-y-2 select-none overflow-y-auto">
-        {/* --- NEW: Rendering logic with nested map --- */}
+      {/* Navigation */}
+      <nav className="flex-grow p-4 pt-2 space-y-2 select-none overflow-y-auto">
         {groupedSidebarItems.map((group, groupIndex) => (
           <div key={groupIndex}>
             {isOpen && (
@@ -146,13 +158,13 @@ const Sidebar = ({ adminData }) => {
                 key={itemIndex}
                 to={item.path}
                 className={`flex items-center ${
-                  isOpen ? "justify-start space-x-3" : "justify-center"
-                } px-4 py-3 rounded-xl transition-colors ${
+                  isOpen ? "justify-start space-x-3" : "justify-center mt-5"
+                } px-4 py-3  rounded-xl transition-colors ${
                   location.pathname === item.path
                     ? "bg-blue-50 text-blue-600 font-semibold"
-                    : "text-gray-600 hover:bg-gray-100"
+                    : "text-gray-600 hover:bg-gray-100 mt-2"
                 }`}
-                title={!isOpen ? item.label : ""} // Show tooltip when collapsed
+                title={!isOpen ? item.label : ""}
               >
                 <item.icon className="w-5 h-5 flex-shrink-0" />
                 {isOpen && (
@@ -163,42 +175,6 @@ const Sidebar = ({ adminData }) => {
           </div>
         ))}
       </nav>
-
-      {/* Admin Info + Logout (at the bottom) */}
-      {/* <div className="p-4 border-t border-gray-200 flex-shrink-0">
-        <div
-          className={`flex items-center p-2 rounded-lg ${
-            isOpen ? "mb-2" : "mb-0"
-          }`}
-        >
-          <div
-            className="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center flex-shrink-0"
-            title={getAdminName()}
-          >
-            <span className="text-white text-sm font-semibold">
-              {getAdminInitials()}
-            </span>
-          </div>
-          {isOpen && (
-            <div className="ml-3 min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">
-                {getAdminName()}
-              </p>
-              <p className="text-xs text-gray-500 truncate">{getAdminRole()}</p>
-            </div>
-          )}
-        </div>
-        <button
-          onClick={handleLogout}
-          className={`flex items-center w-full p-3 rounded-xl text-red-600 hover:bg-red-50 transition-colors ${
-            isOpen ? "justify-start space-x-3" : "justify-center"
-          }`}
-          title={!isOpen ? "Logout" : ""}
-        >
-          <LogOut className="w-5 h-5" />
-          {isOpen && <span className="text-sm font-medium">Logout</span>}
-        </button>
-      </div> */}
     </div>
   );
 };

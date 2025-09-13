@@ -1,14 +1,12 @@
-// src/components/Layout.jsx
 import React, { useEffect, useState } from "react";
-import { Outlet } from "react-router-dom"; // <--- 1. Import Outlet
+import { Outlet } from "react-router-dom";
 import Sidebar from "./ui/Sidebar";
 import Navbar from "./ui/TopNavbar";
 
 const Layout = () => {
-  // <--- No need for children prop anymore
   const [adminData, setAdminData] = useState(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
-  // Fetch admin data from localStorage
   useEffect(() => {
     const storedAdminData = localStorage.getItem("adminUser");
     if (storedAdminData) {
@@ -23,17 +21,28 @@ const Layout = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
-      {/* Sidebar */}
-      <Sidebar adminData={adminData} />
+      {/* Sidebar is already fixed from our previous changes */}
+      <Sidebar
+        adminData={adminData}
+        isOpen={isSidebarOpen}
+        setIsOpen={setIsSidebarOpen}
+      />
 
-      {/* Main content */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Top Navbar */}
-        <Navbar adminData={adminData} />
+      {/* --- Main Content Wrapper --- */}
+      <div
+        className={`flex-1 flex flex-col min-w-0 transition-all duration-300 h-screen overflow-y-auto ${
+          isSidebarOpen ? "ml-72" : "ml-20"
+        }`}
+      >
+        {/* --- 1. Navbar  --- */}
 
-        {/* Page Content */}
-        {/* --- 2. Replace {children} with <Outlet /> --- */}
-        <main className="flex-1 p-4 xl:p-8 overflow-auto">
+        <header className="sticky top-0 bg-white z-40">
+          <Navbar adminData={adminData} />
+        </header>
+
+        {/* --- 2. Page Content --- */}
+
+        <main className="flex-1 p-2 pl-4">
           <Outlet />
         </main>
       </div>

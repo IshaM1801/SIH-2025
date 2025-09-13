@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 
-// --- INLINE SVG ICONS ---
-// I have added all the new icons required by the IssueModal
+// --- INLINE SVG ICONS (with additions) ---
 const icons = {
   MapPin: ({ size = 16, ...props }) => (
     <svg
@@ -20,7 +19,7 @@ const icons = {
       <circle cx="12" cy="10" r="3"></circle>
     </svg>
   ),
-  Loader2: () => (
+  Loader2: ({ className = "" }) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width="24"
@@ -31,7 +30,7 @@ const icons = {
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
-      className="animate-spin"
+      className={`animate-spin ${className}`}
     >
       <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
     </svg>
@@ -176,15 +175,97 @@ const icons = {
       <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
     </svg>
   ),
+  Plus: () => (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <line x1="12" y1="5" x2="12" y2="19"></line>
+      <line x1="5" y1="12" x2="19" y2="12"></line>
+    </svg>
+  ),
+  Search: () => (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="11" cy="11" r="8"></circle>
+      <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+    </svg>
+  ),
+  FileX: ({ size = 32 }) => (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
+      <line x1="12" x2="12" y1="18" y2="12"></line>
+      <line x1="12" x2="12" y1="12" y2="18"></line>
+      <polyline points="14 10 12 12 10 10"></polyline>
+    </svg>
+  ),
 };
 
-const statusStyles = {
-  pending: "bg-blue-100 p-1 px-2 text-blue-800 ring-blue-600/20",
-  "In Progress": "bg-purple-100 p-1 px-2 text-purple-800 ring-purple-600/20",
-  resolved: "bg-green-100 p-1 px-2 text-green-800 ring-green-600/20",
+// --- Sub-Components for UI States ---
+
+const TableSkeleton = () => (
+  <div className="space-y-2">
+    {[...Array(5)].map((_, i) => (
+      <div
+        key={i}
+        className="bg-gray-100 h-16 w-full rounded-lg animate-pulse"
+      ></div>
+    ))}
+  </div>
+);
+
+const EmptyState = () => (
+  <div className="text-center py-16">
+    <icons.FileX className="mx-auto text-gray-400" />
+    <h3 className="mt-2 text-lg font-semibold text-gray-800">
+      No Reports Found
+    </h3>
+    <p className="mt-1 text-sm text-gray-500">
+      There are no issues matching your current filters.
+    </p>
+  </div>
+);
+
+const Toast = ({ message, type, onClose }) => {
+  useEffect(() => {
+    const timer = setTimeout(onClose, 3000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  const baseClasses =
+    "fixed bottom-5 right-5 z-50 px-4 py-3 rounded-lg shadow-lg text-sm font-semibold animate-in fade-in-0 slide-in-from-bottom-5";
+  const typeClasses =
+    type === "success" ? "bg-green-600 text-white" : "bg-red-600 text-white";
+
+  return <div className={`${baseClasses} ${typeClasses}`}>{message}</div>;
 };
 
-// --- Placeholder Components for Modal ---
 const SeverityBadge = ({ severity }) => (
   <div
     className={`px-3 py-1 text-xs font-bold rounded-full inline-block capitalize ${
@@ -198,14 +279,8 @@ const SeverityBadge = ({ severity }) => (
     {severity}
   </div>
 );
-const Comments = ({ issueId, isAdmin }) => (
-  <div className="bg-gray-50 rounded-lg p-4">
-    <h3 className="font-semibold text-gray-800 mb-2">Comments</h3>
-    <p className="text-sm text-gray-500">
-      Comments feature coming soon for issue ID: {issueId}.
-    </p>
-  </div>
-);
+
+// --- Modals ---
 
 const IssueModal = ({ issue, onClose }) => {
   const [upvotes, setUpvotes] = useState(issue?.upvotes || 0);
@@ -231,7 +306,7 @@ const IssueModal = ({ issue, onClose }) => {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto pl-6 ">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-6">
               <div className="bg-gray-50 rounded-lg p-4 border">
@@ -346,169 +421,217 @@ const IssueModal = ({ issue, onClose }) => {
   );
 };
 
+const AssignmentModal = ({ issue, team, onAssign, onDeassign, onClose }) => {
+  const [selected, setSelected] = useState(() =>
+    issue.assigned_to.map((e) => e.emp_email)
+  );
+
+  const toggleSelection = (empEmail) => {
+    setSelected((prev) =>
+      prev.includes(empEmail)
+        ? prev.filter((e) => e !== empEmail)
+        : [...prev, empEmail]
+    );
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-50 flex justify-center items-center p-4 animate-in fade-in-0 duration-300">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
+        <div className="p-4 border-b flex justify-between items-center">
+          <h3 className="text-lg font-bold text-gray-800">
+            Assign Team Members
+          </h3>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-800 p-1 rounded-full hover:bg-gray-200"
+          >
+            <icons.X size={20} />
+          </button>
+        </div>
+        <div className="p-4 max-h-64 overflow-y-auto">
+          {team.map((emp) => (
+            <label
+              key={emp.emp_id}
+              className="flex items-center space-x-3 p-2 rounded-lg hover:bg-blue-50 cursor-pointer"
+            >
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded text-blue-600 border-gray-300 focus:ring-blue-500"
+                checked={selected.includes(emp.emp_email)}
+                onChange={() => toggleSelection(emp.emp_email)}
+              />
+              <span className="text-sm font-medium text-gray-700">
+                {emp.name}
+              </span>
+            </label>
+          ))}
+        </div>
+        <div className="p-4 bg-gray-50 border-t rounded-b-2xl flex justify-between items-center">
+          {issue.assigned_to.length > 0 && (
+            <button
+              onClick={() => onDeassign(issue.issue_id)}
+              className="text-sm font-semibold text-red-600 hover:text-red-800"
+            >
+              De-assign All
+            </button>
+          )}
+          <div className="flex-grow"></div> {/* Spacer */}
+          <button
+            onClick={() => onAssign(issue.issue_id, selected)}
+            className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg shadow-sm hover:bg-blue-700"
+          >
+            Update Assignment
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- MAIN PAGE COMPONENT ---
 const ReportManagementPage = () => {
   const token = localStorage.getItem("employee_token");
   const [allIssues, setAllIssues] = useState([]);
   const [team, setTeam] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [assigningIssueId, setAssigningIssueId] = useState(null);
-  const [selectedEmployees, setSelectedEmployees] = useState({});
-  const [selectedIssue, setSelectedIssue] = useState(null); // State for the modal
+  const [selectedIssue, setSelectedIssue] = useState(null); // For details modal
+  const [assignmentTarget, setAssignmentTarget] = useState(null); // For assignment modal
+  const [toast, setToast] = useState(null); // { message: '', type: 'success' | 'error' }
+  const [filters, setFilters] = useState({
+    search: "",
+    status: "all",
+    assignee: "all",
+  });
 
-  // Re-pasting functions that were unchanged for completeness
-  const fetchManagerIssues = async () => {
+  // --- Data Fetching ---
+  const fetchData = useCallback(async () => {
     try {
-      setLoading(true);
-      const res = await fetch("http://localhost:5001/issues/dept", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
+      if (!token) return;
+      const [issuesRes, teamRes] = await Promise.all([
+        fetch("http://localhost:5001/issues/dept", {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch("http://localhost:5001/employee/team", {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+      ]);
+      if (!issuesRes.ok || !teamRes.ok) throw new Error("Failed to fetch data");
+
+      const issuesData = await issuesRes.json();
+      const teamData = await teamRes.json();
+
       const uniqueIssuesMap = new Map();
-      data.team.forEach((member) => {
+      issuesData.team.forEach((member) => {
         member.issues.forEach((issue) => {
           if (!uniqueIssuesMap.has(issue.issue_id)) {
             uniqueIssuesMap.set(issue.issue_id, issue);
           }
         });
       });
-      const processedIssues = Array.from(uniqueIssuesMap.values());
-      setAllIssues(processedIssues);
+      setAllIssues(Array.from(uniqueIssuesMap.values()));
+      setTeam(teamData.employees?.filter((emp) => emp.emp_id !== null) || []);
     } catch (err) {
-      console.error("Error fetching manager issues:", err);
+      console.error("Error fetching data:", err);
+      setToast({ message: "Failed to load data.", type: "error" });
     } finally {
       setLoading(false);
     }
-  };
-
-  const fetchTeam = async () => {
-    try {
-      if (!token) return;
-      const res = await fetch("http://localhost:5001/employee/team", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      setTeam(data.employees?.filter((emp) => emp.emp_id !== null) || []);
-    } catch (err) {
-      console.error("Error fetching team:", err);
-    }
-  };
+  }, [token]);
 
   useEffect(() => {
-    fetchManagerIssues();
-    fetchTeam();
-  }, []);
+    fetchData();
+  }, [fetchData]);
 
-  const handleAssignClick = (issue) => {
-    const issueId = issue.issue_id;
-    setAssigningIssueId(issueId);
-    const currentlyAssigned = issue.assigned_to.map((emp) => emp.emp_email);
-    setSelectedEmployees((prev) => ({ ...prev, [issueId]: currentlyAssigned }));
-  };
+  // --- Filtering Logic ---
+  const filteredIssues = useMemo(() => {
+    return allIssues.filter((issue) => {
+      const searchLower = filters.search.toLowerCase();
+      const matchesSearch =
+        searchLower === "" ||
+        issue.issue_title.toLowerCase().includes(searchLower) ||
+        issue.address_component.toLowerCase().includes(searchLower) ||
+        issue.issue_id.toLowerCase().includes(searchLower);
 
-  const toggleEmployeeSelection = (issueId, empEmail) => {
-    setSelectedEmployees((prev) => {
-      const currentSelection = prev[issueId] || [];
-      if (currentSelection.includes(empEmail)) {
-        return {
-          ...prev,
-          [issueId]: currentSelection.filter((e) => e !== empEmail),
-        };
-      } else {
-        return { ...prev, [issueId]: [...currentSelection, empEmail] };
-      }
+      const matchesStatus =
+        filters.status === "all" || issue.status === filters.status;
+
+      const matchesAssignee =
+        filters.assignee === "all" ||
+        (filters.assignee === "unassigned" && issue.assigned_to.length === 0) ||
+        issue.assigned_to.some((emp) => emp.emp_email === filters.assignee);
+
+      return matchesSearch && matchesStatus && matchesAssignee;
     });
-  };
+  }, [allIssues, filters]);
 
-  const assignMultipleEmployees = async (issueId) => {
+  // --- API Actions ---
+  const handleApiAction = async (action, successMsg, errorMsg) => {
     try {
-      const emp_emails = selectedEmployees[issueId] || [];
-      const res = await fetch("http://localhost:5001/issues/assign-issue", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ issueId, emp_emails }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      await res.json();
-      alert("Assignments updated successfully!");
-      fetchManagerIssues();
-      setAssigningIssueId(null);
+      await action();
+      setToast({ message: successMsg, type: "success" });
+      fetchData();
     } catch (err) {
-      console.error("Error assigning employees:", err);
-      alert("Failed to update assignments.");
+      console.error(errorMsg, err);
+      setToast({ message: `${errorMsg}: ${err.message}`, type: "error" });
     }
   };
 
-  // --- NEW FUNCTION TO DE-ASSIGN ALL EMPLOYEES ---
-  const deassignIssue = async (issueId) => {
-    // Add a confirmation dialog for safety
-    if (
-      !window.confirm(
-        "Are you sure you want to remove all assignments for this issue?"
-      )
-    ) {
-      return;
-    }
-
-    try {
-      const res = await fetch("http://localhost:5001/issues/deassign", {
-        // Make sure this route is correct
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ issueId }),
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || `HTTP ${res.status}`);
-      }
-
-      await res.json();
-      alert("Issue assignments cleared successfully.");
-      fetchManagerIssues(); // Refresh the list
-      setAssigningIssueId(null); // Close the dropdown
-    } catch (err) {
-      console.error("Error de-assigning issue:", err);
-      alert(`Failed to de-assign issue: ${err.message}`);
-    }
-  };
-
-  const updateStatus = async (issueId, newStatus) => {
-    try {
-      if (!token) return;
-      const res = await fetch(
-        `http://localhost:5001/issues/update-status/${issueId}`,
-        {
-          method: "PATCH",
+  const assignMultipleEmployees = (issueId, emp_emails) =>
+    handleApiAction(
+      async () => {
+        const res = await fetch("http://localhost:5001/issues/assign-issue", {
+          method: "POST",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ status: newStatus }),
-        }
-      );
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setAllIssues((prev) =>
-        prev.map((issue) =>
-          issue.issue_id === issueId ? { ...issue, status: newStatus } : issue
-        )
-      );
-    } catch (err) {
-      console.error("Error updating status:", err);
-      alert("Failed to update status.");
-    }
-  };
+          body: JSON.stringify({ issueId, emp_emails }),
+        });
+        if (!res.ok)
+          throw new Error((await res.json()).error || "Server error");
+      },
+      "Assignments updated successfully!",
+      "Failed to update assignments"
+    ).finally(() => setAssignmentTarget(null));
 
-  const filteredIssues = useMemo(() => {
-    return allIssues; // Simplified for now, add search/filter logic back if needed
-  }, [allIssues]);
+  const deassignIssue = (issueId) =>
+    handleApiAction(
+      async () => {
+        const res = await fetch("http://localhost:5001/issues/deassign", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ issueId }),
+        });
+        if (!res.ok)
+          throw new Error((await res.json()).error || "Server error");
+      },
+      "Issue assignments cleared.",
+      "Failed to de-assign issue"
+    ).finally(() => setAssignmentTarget(null));
+
+  const updateStatus = (issueId, newStatus) =>
+    handleApiAction(
+      async () => {
+        const res = await fetch(
+          `http://localhost:5001/issues/update-status/${issueId}`,
+          {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ status: newStatus }),
+          }
+        );
+        if (!res.ok)
+          throw new Error((await res.json()).error || "Server error");
+      },
+      "Status updated successfully!",
+      "Failed to update status"
+    );
 
   const getRelativeDate = (dateString) => {
     const today = new Date();
@@ -522,140 +645,172 @@ const ReportManagementPage = () => {
 
   return (
     <>
-      <div className="bg-gray-50 min-h-screen">
-        <main className="max-w-7xl">
-          <div className="bg-white p-6 rounded-xl shadow-sm mb-8">
-            <h3 className="text-xl font-semibold text-gray-800 mb-4">
-              Manage Team Reports
-            </h3>
-            {loading ? (
-              <div className="text-center py-10">
-                <icons.Loader2 /> <p>Loading...</p>
-              </div>
-            ) : (
-              <ul className="divide-y divide-gray-200">
-                {filteredIssues.map((report) => (
-                  <li key={report.issue_id} className="py-4 px-2">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-                      <div
-                        className="flex-grow cursor-pointer"
-                        onClick={() => setSelectedIssue(report)}
-                      >
-                        <h4 className="text-lg font-semibold text-gray-800 hover:text-blue-600">
-                          {report.issue_title}
-                        </h4>
-                        <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
-                          <icons.MapPin size={14} />
-                          <span>{report.address_component}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-gray-600 mt-2">
-                          <icons.Users size={14} />
-                          {report.assigned_to.length > 0 ? (
-                            <span className="font-medium">
-                              {report.assigned_to.map((e) => e.name).join(", ")}
-                            </span>
-                          ) : (
-                            <span className="text-gray-400 italic">
-                              Unassigned
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap gap-10 mt-4 sm:mt-0 sm:ml-4 items-center flex-shrink-0">
-                        <div className="relative">
-                          <button
-                            onClick={() =>
-                              assigningIssueId === report.issue_id
-                                ? setAssigningIssueId(null)
-                                : handleAssignClick(report)
-                            }
-                            className="px-3 py-1 text-sm border rounded-md shadow-sm bg-white hover:bg-gray-50 flex items-center gap-1"
-                          >
-                            Assign ({report.assigned_to.length}){" "}
-                            <icons.ChevronDown />
-                          </button>
-                          {assigningIssueId === report.issue_id && (
-                            <div className="absolute z-20 mt-2 w-48 right-0 bg-white border rounded-lg shadow-xl p-2">
-                              {/* ... Assignment dropdown content ... */}
-                              <p className="text-xs font-bold text-gray-600 px-2 pb-1">
-                                Select Team Members
-                              </p>
-                              <div className="max-h-48 overflow-y-auto">
-                                {team.map((emp) => (
-                                  <label
-                                    key={emp.emp_email}
-                                    className="flex items-center space-x-2 p-2 rounded-md hover:bg-blue-50 cursor-pointer"
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      className="rounded text-blue-600"
-                                      checked={(
-                                        selectedEmployees[report.issue_id] || []
-                                      ).includes(emp.emp_email)}
-                                      onChange={() =>
-                                        toggleEmployeeSelection(
-                                          report.issue_id,
-                                          emp.emp_email
-                                        )
-                                      }
-                                    />
-                                    <span className="text-sm">{emp.name}</span>
-                                  </label>
-                                ))}
-                              </div>
-                              <button
-                                onClick={() =>
-                                  assignMultipleEmployees(report.issue_id)
-                                }
-                                className="mt-2 w-full bg-blue-600 text-white text-xs font-semibold py-2 px-2 rounded-md hover:bg-blue-700"
-                              >
-                                Update Assignment
-                              </button>
-                              {/* --- NEW DE-ASSIGN BUTTON --- */}
-                              {report.assigned_to.length > 0 && (
-                                <button
-                                  onClick={() => deassignIssue(report.issue_id)}
-                                  className="mt-1 w-full bg-transparent border border-red-500 text-red-500 text-xs font-semibold py-2 px-2 rounded-md hover:bg-red-50"
-                                >
-                                  De-assign All
-                                </button>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-5">
-                          <select
-                            value={report.status}
-                            onChange={(e) =>
-                              updateStatus(report.issue_id, e.target.value)
-                            }
-                            className={`text-xs border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 font-medium ${
-                              statusStyles[report.status]
-                            }`}
-                          >
-                            <option value="pending">Pending</option>
-                            <option value="In Progress">In Progress</option>
-                            <option value="resolved">Resolved</option>
-                          </select>
-                          <span className="text-sm text-gray-500 w-30 text-right">
-                            {getRelativeDate(report.created_at)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
+      <div>
+        {/* --- Header --- */}
+        <div className="sm:flex sm:items-center sm:justify-between mb-2 ml-2">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Manage Reports</h1>
           </div>
-        </main>
+          {/* <div className="mt-4 sm:mt-0 sm:ml-16">
+            <button className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg shadow-sm hover:bg-blue-700">
+              <icons.Plus /> New Report
+            </button>
+          </div> */}
+        </div>
+
+        {/* --- Filters --- */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4 p-4 bg-white rounded-lg border">
+          <div className="relative">
+            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+              <icons.Search />
+            </div>
+            <input
+              type="text"
+              placeholder="Search by title, ID, location..."
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg bg-gray-50 "
+              value={filters.search}
+              onChange={(e) =>
+                setFilters({ ...filters, search: e.target.value })
+              }
+            />
+          </div>
+          <select
+            value={filters.status}
+            onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+            className="w-full border px-4 py-2  border-gray-300 rounded-lg bg-gray-50 "
+          >
+            <option value="all">All Statuses</option>
+            <option value="pending">Pending</option>
+            <option value="In Progress">In Progress</option>
+            <option value="resolved">Resolved</option>
+          </select>
+          <select
+            value={filters.assignee}
+            onChange={(e) =>
+              setFilters({ ...filters, assignee: e.target.value })
+            }
+            className="px-4 py-2 w-full border border-gray-300 rounded-lg bg-gray-50 "
+          >
+            <option value="all">All Assignees</option>
+            <option value="unassigned">Unassigned</option>
+            {team.map((emp) => (
+              <option key={emp.emp_id} value={emp.emp_email}>
+                {emp.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* --- Table --- */}
+        <div className="bg-white p-2 rounded-xl shadow-sm border overflow-x-auto">
+          {loading ? (
+            <TableSkeleton />
+          ) : filteredIssues.length > 0 ? (
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                    Issue Details
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                    Assigned To
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                    Date Reported
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredIssues.map((issue) => (
+                  <tr key={issue.issue_id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div
+                        className="font-semibold text-gray-900 cursor-pointer hover:text-blue-600"
+                        onClick={() => setSelectedIssue(issue)}
+                      >
+                        {issue.issue_title}
+                      </div>
+                      <div className="text-sm text-gray-500 flex items-center gap-1">
+                        <icons.MapPin size={12} />
+                        {issue.address_component}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                      {issue.assigned_to.length > 0 ? (
+                        issue.assigned_to.map((e) => e.name).join(", ")
+                      ) : (
+                        <span className="italic text-gray-400">Unassigned</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <select
+                        value={issue.status}
+                        onChange={(e) =>
+                          updateStatus(issue.issue_id, e.target.value)
+                        }
+                        onClick={(e) => e.stopPropagation()} // Prevent row click
+                        className={`text-xs border-gray-300 rounded-full px-2 py-1 shadow-sm font-large font-semibold
+ ${
+   {
+     pending: "bg-blue-100 text-blue-800",
+     "In Progress": "bg-purple-100 text-purple-800",
+     resolved: "bg-green-100 text-green-800",
+   }[issue.status]
+ }`}
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="In Progress">In Progress</option>
+                        <option value="resolved">Resolved</option>
+                      </select>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {getRelativeDate(issue.created_at)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <button
+                        onClick={() => setAssignmentTarget(issue)}
+                        className="text-blue-600 hover:text-blue-900"
+                      >
+                        Assign
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <EmptyState />
+          )}
+        </div>
       </div>
 
-      {/* Render the modal if an issue is selected */}
+      {/* --- Modals & Toasts --- */}
       {selectedIssue && (
         <IssueModal
           issue={selectedIssue}
           onClose={() => setSelectedIssue(null)}
+        />
+      )}
+      {assignmentTarget && (
+        <AssignmentModal
+          issue={assignmentTarget}
+          team={team}
+          onClose={() => setAssignmentTarget(null)}
+          onAssign={assignMultipleEmployees}
+          onDeassign={deassignIssue}
+        />
+      )}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
         />
       )}
     </>

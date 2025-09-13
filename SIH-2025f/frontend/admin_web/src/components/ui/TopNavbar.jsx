@@ -131,7 +131,7 @@ const Navbar = ({ adminData }) => {
         {/* Left Side */}
         <div>
           <img
-            src="../../../public/icons/Emblem_of_India.png"
+            src="../../../icons/Emblem_of_India.png"
             alt="Jharkhand Logo"
             className="h-15"
           />

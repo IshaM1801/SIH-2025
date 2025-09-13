@@ -296,7 +296,7 @@ const IssueModal = ({ issue, onClose }) => {
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex justify-center items-center p-4 animate-in fade-in-0 duration-300">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-        <div className="bg-gray-100 p-4 border-b flex justify-between items-center">
+        <div className="bg-gray-100 p-4 border-b flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold text-gray-800">Report Details</h2>
           <button
             onClick={onClose}
@@ -332,14 +332,14 @@ const IssueModal = ({ issue, onClose }) => {
                   <img
                     src={issue.image_url}
                     alt="Issue"
-                    className="rounded-lg w-full max-h-80 object-cover border"
+                    className="mb-4 rounded-lg w-full max-h-80 object-cover border"
                   />
                 </div>
               )}
               {/* <Comments issueId={issue.issue_id} isAdmin={true} /> */}
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-4 mr-5">
               <div className="bg-gray-50 rounded-lg p-4 border">
                 <h3 className="font-semibold text-gray-800 mb-4">Details</h3>
                 <div className="space-y-4 text-sm">

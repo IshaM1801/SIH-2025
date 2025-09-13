@@ -2,11 +2,93 @@ import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Bell, Search, Plus, Settings, User, LogOut } from "lucide-react";
 
-const Navbar = ({ adminData, kpiData }) => {
+// --- Data Processing Function (now inside the same file) ---
+const calculateIssueKpis = (apiData) => {
+  if (!apiData || !apiData.team || !Array.isArray(apiData.team)) {
+    return { open: 0, resolved: 0 };
+  }
+  const uniqueIssues = new Map();
+  apiData.team.forEach((member) => {
+    if (member.issues && Array.isArray(member.issues)) {
+      member.issues.forEach((issue) => {
+        uniqueIssues.set(issue.issue_id, issue);
+      });
+    }
+  });
+
+  let openCount = 0;
+  let resolvedCount = 0;
+  for (const issue of uniqueIssues.values()) {
+    if (issue.status === "resolved") {
+      resolvedCount++;
+    } else {
+      openCount++;
+    }
+  }
+  return { open: openCount, resolved: resolvedCount };
+};
+
+// --- Navbar Component ---
+const Navbar = ({ adminData }) => {
+  // Note: `kpiData` is no longer a prop
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
+
+  const handleLogout = () => {
+    localStorage.removeItem("employee_token");
+    localStorage.removeItem("adminData");
+    navigate("/login");
+  };
+
+  // --- State for holding KPI data ---
+  const [kpiData, setKpiData] = useState(null); // Initialize to null for loading state
+
+  // --- useEffect to fetch data on component mount ---
+  useEffect(() => {
+    const fetchKpiData = async () => {
+      // --- 1. Get the token from localStorage ---
+      const token = localStorage.getItem("employee_token");
+
+      // --- 2. If no token, don't attempt to fetch ---
+      if (!token) {
+        console.error("No authentication token found. Redirecting to login.");
+        handleLogout(); // Redirect to login if not authenticated
+        return;
+      }
+
+      try {
+        // --- 3. Add the token to the fetch request headers ---
+        const response = await fetch("http://localhost:5001/issues/dept", {
+          headers: {
+            Authorization: `Bearer ${token}`, // Standard Bearer token format
+            "Content-Type": "application/json",
+          },
+        });
+
+        // --- 4. Handle invalid token or other auth errors ---
+        if (!response.ok) {
+          if (response.status === 401 || response.status === 403) {
+            console.error(
+              "Authentication error. Token may be invalid or expired."
+            );
+            handleLogout(); // Log out the user if token is rejected
+          }
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const jsonData = await response.json();
+        const calculatedKpis = calculateIssueKpis(jsonData);
+        setKpiData(calculatedKpis);
+      } catch (e) {
+        console.error("Failed to fetch or process KPI data:", e);
+        setKpiData({ open: 0, resolved: 0 });
+      }
+    };
+
+    fetchKpiData();
+  }, [handleLogout]); // The empty array [] ensures this effect runs only once
 
   const getGreeting = () => {
     const hours = new Date().getHours();
@@ -15,6 +97,7 @@ const Navbar = ({ adminData, kpiData }) => {
     return "Good Evening!";
   };
 
+  // ... (getAdminName, getAdminInitials, handleLogout, and the other useEffect for the dropdown remain exactly the same) ...
   const getAdminName = () => {
     if (adminData?.name) return adminData.name;
     if (adminData?.employee?.name) return adminData.employee.name;
@@ -30,13 +113,6 @@ const Navbar = ({ adminData, kpiData }) => {
     return name.substring(0, 2).toUpperCase();
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("adminData");
-    navigate("/login");
-  };
-
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -48,9 +124,6 @@ const Navbar = ({ adminData, kpiData }) => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
-
-  const defaultKpiData = { open: 152, resolved: 23 };
-  const displayKpi = kpiData || defaultKpiData;
 
   return (
     <div className="bg-white border-b border-gray-200 px-6 py-4 shadow-sm">
@@ -68,7 +141,8 @@ const Navbar = ({ adminData, kpiData }) => {
           <div className="hidden lg:flex items-center gap-6">
             <div className="text-center">
               <p className="text-2xl font-semibold text-blue-600">
-                {displayKpi.open}
+                {/* Now reads from internal state, showing '...' while loading */}
+                {kpiData ? kpiData.open : "..."}
               </p>
               <p className="text-xs text-gray-500 uppercase tracking-wider">
                 Open Issues
@@ -77,10 +151,11 @@ const Navbar = ({ adminData, kpiData }) => {
             <div className="h-10 border-l border-gray-200"></div>
             <div className="text-center">
               <p className="text-2xl font-semibold text-green-600">
-                {displayKpi.resolved}
+                {kpiData ? kpiData.resolved : "..."}
               </p>
               <p className="text-xs text-gray-500 uppercase tracking-wider">
-                Resolved Today
+                {/* IMPORTANT: As noted before, this is Total Resolved, not "Today" */}
+                Total Resolved
               </p>
             </div>
           </div>
@@ -98,20 +173,13 @@ const Navbar = ({ adminData, kpiData }) => {
           </div>
         </div>
 
-        {/* Right Side */}
+        {/* Right Side (User Profile, etc) */}
+        {/* ... This part of your JSX remains exactly the same ... */}
         <div className="flex items-center gap-4 flex-shrink-0">
-          {/* <button className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-sm hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-            <Plus className="w-5 h-5" />
-            <span className="hidden sm:inline">New Issue</span>
-          </button> */}
-
           <button className="p-2.5 rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors">
             <Bell className="w-6 h-6" />
           </button>
-
           <div className="h-8 border-l border-gray-200"></div>
-
-          {/* User Profile Dropdown */}
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setIsDropdownOpen((prev) => !prev)}
@@ -128,30 +196,26 @@ const Navbar = ({ adminData, kpiData }) => {
                 </span>
               </div>
             </button>
-
             {isDropdownOpen && (
               <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50">
                 <a
                   href="/profile"
                   className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                 >
-                  <User className="w-4 h-4" />
-                  My Profile
+                  <User className="w-4 h-4" /> My Profile
                 </a>
                 <a
                   href="/settings"
                   className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                 >
-                  <Settings className="w-4 h-4" />
-                  Settings
+                  <Settings className="w-4 h-4" /> Settings
                 </a>
                 <div className="my-1 border-t border-gray-100"></div>
                 <button
                   onClick={handleLogout}
                   className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
                 >
-                  <LogOut className="w-4 h-4" />
-                  Logout
+                  <LogOut className="w-4 h-4" /> Logout
                 </button>
               </div>
             )}

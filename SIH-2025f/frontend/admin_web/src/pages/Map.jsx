@@ -305,7 +305,7 @@ export default function CivicIssueMap() {
   }
 
   return (
-    <div className="w-full h-145 bg-gray-50">
+    <div className="w-full h-full bg-gray-50">
       <div className="bg-white shadow-lg rounded-2xl h-full w-full overflow-hidden relative">
         {isLoadingMap && (
           <div className="absolute inset-0 bg-white/80 flex flex-col items-center justify-center z-20 backdrop-blur-sm">

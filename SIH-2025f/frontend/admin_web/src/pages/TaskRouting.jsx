@@ -1,27 +1,18 @@
 import React, { useEffect, useState } from "react";
+import {
+  Loader2,
+  MapPin,
+  CheckCircle,
+  Clock,
+  AlertCircle,
+  Upload,
+} from "lucide-react";
 
-// Inline loader icon
+// Loader in center
 const Loader = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    className="animate-spin h-8 w-8 text-blue-500 mx-auto"
-    fill="none"
-    viewBox="0 0 24 24"
-  >
-    <circle
-      className="opacity-25"
-      cx="12"
-      cy="12"
-      r="10"
-      stroke="currentColor"
-      strokeWidth="4"
-    ></circle>
-    <path
-      className="opacity-75"
-      fill="currentColor"
-      d="M4 12a8 8 0 018-8v8z"
-    ></path>
-  </svg>
+  <div className="flex items-center justify-center py-10">
+    <Loader2 className="animate-spin h-8 w-8 text-blue-500" />
+  </div>
 );
 
 const TaskRouting = () => {
@@ -29,11 +20,9 @@ const TaskRouting = () => {
   const user = JSON.parse(localStorage.getItem("employee") || "{}");
 
   const [tasks, setTasks] = useState([]);
-  const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [ws, setWs] = useState(null);
-  const [aiLoading, setAiLoading] = useState({}); // Track loading per task
+  const [aiLoading, setAiLoading] = useState({});
 
   // --- Fetch tasks ---
   const fetchTasks = async () => {
@@ -46,7 +35,7 @@ const TaskRouting = () => {
       const employee = dataMe.employee;
       if (!employee || employee.position !== 0) {
         setTasks([]);
-        setError("You are not an employee. No tasks assigned.");
+        setError("You are not authorized to view tasks.");
         setLoading(false);
         return;
       }
@@ -65,21 +54,6 @@ const TaskRouting = () => {
       setLoading(false);
     }
   };
-
-  // --- WebSocket notifications ---
-  useEffect(() => {
-    if (!user?.emp_id) return;
-    const socket = new WebSocket("ws://localhost:8080");
-    socket.onopen = () =>
-      socket.send(JSON.stringify({ employeeId: user.emp_id }));
-    socket.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.type === "new_issue")
-        setNotifications((prev) => [data, ...prev]);
-    };
-    setWs(socket);
-    return () => socket.close();
-  }, [user?.emp_id]);
 
   useEffect(() => {
     fetchTasks();
@@ -124,9 +98,38 @@ const TaskRouting = () => {
     imageInput.click();
   };
 
+  // --- Status badge ---
+  const StatusBadge = ({ status }) => {
+    let icon, color, bg;
+    switch (status) {
+      case "Resolved":
+        icon = <CheckCircle className="w-4 h-4" />;
+        color = "text-green-700";
+        bg = "bg-green-100";
+        break;
+      case "In Progress":
+        icon = <Clock className="w-4 h-4" />;
+        color = "text-yellow-700";
+        bg = "bg-yellow-100";
+        break;
+      default:
+        icon = <AlertCircle className="w-4 h-4" />;
+        color = "text-gray-700";
+        bg = "bg-gray-100";
+    }
+    return (
+      <span
+        className={`flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${bg} ${color}`}
+      >
+        {icon}
+        {status || "Pending"}
+      </span>
+    );
+  };
+
   return (
-    <div className="bg-gray-50 min-h-screen p-4">
-      <h2 className="text-2xl font-bold mb-4">My Tasks</h2>
+    <div className="bg-gray-50 min-h-screen p-6">
+      <h2 className="text-2xl font-bold mb-6 text-gray-800">📋 My Tasks</h2>
 
       {loading && <Loader />}
       {!loading && error && <p className="text-red-500">{error}</p>}
@@ -135,55 +138,53 @@ const TaskRouting = () => {
       )}
 
       {!loading && tasks.length > 0 && (
-        <ul className="divide-y divide-gray-200 mb-6">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {tasks.map((task) => (
-            <li
+            <div
               key={task.issue_id}
-              className="p-4 bg-white rounded shadow mb-2 flex justify-between items-center"
+              className="p-5 bg-white rounded-xl shadow hover:shadow-md transition border border-gray-100 flex flex-col justify-between"
             >
               <div>
-                <h3 className="font-semibold text-gray-800">
+                <img
+                  src={task.image_url}
+                  alt={task.issue_title}
+                  className="w-full h-45 object-cover rounded-md mb-2"
+                />
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-1">
                   {task.issue_title}
                 </h3>
-                <p className="text-sm text-gray-500">
+                <p className="flex items-center text-sm text-gray-500 mb-2">
+                  <MapPin className="w-4 h-4 mr-1" />
                   {task.address_component || "No location"}
                 </p>
               </div>
-              <div className="flex items-center space-x-2">
-                <span className="px-2 py-1 text-xs font-medium rounded-full ring-1 bg-blue-100 text-blue-800">
-                  {task.status || "Pending"}
-                </span>
+
+              <div className="flex items-center justify-between mt-3">
+                <StatusBadge status={task.status} />
                 <button
                   disabled={aiLoading[task.issue_id]}
                   onClick={() => handleAIUpdate(task.issue_id)}
-                  className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50"
+                  className="flex items-center gap-1 px-3 py-1.5 bg-green-500 text-white text-sm rounded-lg hover:bg-green-600 disabled:opacity-50"
                 >
-                  {aiLoading[task.issue_id] ? "Updating..." : "Update Report"}
+                  {aiLoading[task.issue_id] ? (
+                    <>
+                      <Loader2 className="animate-spin w-4 h-4" />
+                      Updating...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-4 h-4" />
+                      Update
+                    </>
+                  )}
                 </button>
               </div>
-            </li>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
-
-      {/* Notifications */}
-      <div className="bg-white p-4 rounded shadow">
-        <h3 className="text-lg font-semibold mb-2">Notifications</h3>
-        {notifications.length === 0 ? (
-          <p className="text-gray-500 text-sm">No new notifications</p>
-        ) : (
-          <ul className="space-y-2">
-            {notifications.map((n, idx) => (
-              <li
-                key={idx}
-                className="p-2 bg-blue-50 border-l-4 border-blue-500 rounded text-sm text-blue-700"
-              >
-                {n.message}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
     </div>
   );
 };

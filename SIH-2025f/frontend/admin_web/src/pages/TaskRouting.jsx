@@ -70,10 +70,12 @@ const TaskRouting = () => {
   useEffect(() => {
     if (!user?.emp_id) return;
     const socket = new WebSocket("ws://localhost:8080");
-    socket.onopen = () => socket.send(JSON.stringify({ employeeId: user.emp_id }));
+    socket.onopen = () =>
+      socket.send(JSON.stringify({ employeeId: user.emp_id }));
     socket.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      if (data.type === "new_issue") setNotifications((prev) => [data, ...prev]);
+      if (data.type === "new_issue")
+        setNotifications((prev) => [data, ...prev]);
     };
     setWs(socket);
     return () => socket.close();
@@ -94,16 +96,19 @@ const TaskRouting = () => {
 
       const formData = new FormData();
       formData.append("issue_id", issue_id);
-      formData.append("fixedImage", fixedImage);
+      formData.append("fixedImageFile", fixedImage);
 
       setAiLoading((prev) => ({ ...prev, [issue_id]: true }));
 
       try {
-        const res = await fetch("http://localhost:5001/agent/update-issue", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
-          body: formData,
-        });
+        const res = await fetch(
+          `http://localhost:5001/issues/agent-update/${issue_id}`,
+          {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+            body: formData,
+          }
+        );
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "AI update failed");
 
@@ -137,7 +142,9 @@ const TaskRouting = () => {
               className="p-4 bg-white rounded shadow mb-2 flex justify-between items-center"
             >
               <div>
-                <h3 className="font-semibold text-gray-800">{task.issue_title}</h3>
+                <h3 className="font-semibold text-gray-800">
+                  {task.issue_title}
+                </h3>
                 <p className="text-sm text-gray-500">
                   {task.address_component || "No location"}
                 </p>

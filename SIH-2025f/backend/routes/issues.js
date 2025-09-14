@@ -14,7 +14,7 @@ const {
   classifyReport,
   getDeptIssues,
   updateIssueStatus,
-  fetchAddress,
+  agentUpdateIssue,
   createIssueWithLocation,
 } = require("../controllers/issuesController");
 
@@ -32,7 +32,6 @@ router.post(
   upload.single("photo"),
   createIssueWithLocation
 );
-router.post("/fetch-address", fetchAddress);
 // Fetch single issue by ID
 router.get("/dept/:issue_id", authMiddleware, getDeptIssues);
 
@@ -40,6 +39,12 @@ router.get("/dept/:issue_id", authMiddleware, getDeptIssues);
 router.get("/dept", authMiddleware, getDeptIssues);
 router.patch("/update-status/:issueId", authMiddleware, updateIssueStatus);
 router.post("/classify-report", authMiddleware, classifyReport);
+router.post(
+  "/agent-update/:issue_id",
+  authMiddleware,
+  upload.single("fixedImageFile"),
+  agentUpdateIssue
+);
 
 router.post("/assign-issue", authMiddleware, assignIssueToEmployee);
 router.post("/deassign", authMiddleware, removeIssueAssignment);

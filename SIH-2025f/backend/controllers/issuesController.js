@@ -4,55 +4,35 @@ const { sendWhatsAppMessage } = require("../services/whatsappService");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-
-// ✅ Create a shared reverse geocoding function
-const reverseGeocode = async (latitude, longitude) => {
+//function to convert image URL to base64 to pass gemini
+async function urlToGenerativePart(url) {
   try {
-    const openCageKey = process.env.OPENCAGE_KEY;
-    const geoCodeRes = await axios.get(
-      `https://api.opencagedata.com/geocode/v1/json?q=${latitude}+${longitude}&key=${openCageKey}&no_annotations=1`
-    );
+    const response = await axios.get(url, {
+      responseType: "arraybuffer",
+    });
 
-    if (geoCodeRes.data?.results?.length > 0) {
-      const c = geoCodeRes.data.results[0].components;
-      return [
-        c.suburb || c.neighbourhood || c.village,
-        c.city || c.town || c.village,
-        c.state,
-        c.country,
-      ]
-        .filter(Boolean)
-        .join(", ");
-    }
-    return "Unknown location";
-  } catch (geoErr) {
-    console.warn("⚠️ Reverse geocode failed:", geoErr.message);
-    return "Unknown location";
-  }
-};
+    // Convert the image data to a base64 string
+    const base64Data = Buffer.from(response.data, "binary").toString("base64");
 
-// ✅ Enhanced fetch-address route that just calls the shared function
-const fetchAddress = async (req, res) => {
-  try {
-    const { latitude, longitude } = req.body;
-    
-    if (!latitude || !longitude) {
-      return res.status(400).json({ error: "Latitude and longitude are required" });
+    // Get the mime type from the response headers
+    const mimeType = response.headers["content-type"];
+
+    if (!mimeType || !base64Data) {
+      throw new Error("Could not fetch or process image from URL.");
     }
 
-    console.log("🌍 Fetching address for:", latitude, longitude);
-    
-    const formattedAddress = await reverseGeocode(latitude, longitude);
-    
-    console.log("✅ Address resolved:", formattedAddress);
-    
-    res.json({ address: formattedAddress });
-  } catch (err) {
-    console.error("fetchAddress error:", err);
-    res.status(500).json({ error: "Internal server error" });
+    return {
+      inlineData: {
+        data: base64Data,
+        mimeType: mimeType,
+      },
+    };
+  } catch (error) {
+    console.error(`Error fetching image from ${url}:`, error.message);
+    // Re-throw the error to be caught by the main controller's catch block
+    throw new Error(`Failed to process image from URL: ${url}`);
   }
-};
-
+}
 
 const createIssueWithLocation = async (req, res) => {
   try {
@@ -90,8 +70,30 @@ const createIssueWithLocation = async (req, res) => {
       }
     }
 
-    // 2️⃣ Use shared reverse geocoding function
-    const formattedAddress = lat && lng ? await reverseGeocode(lat, lng) : "Unknown location";
+    // 2️⃣ Reverse geocode with OpenCage
+    let formattedAddress = "Unknown location";
+    if (lat && lng) {
+      try {
+        const openCageKey = process.env.OPENCAGE_KEY;
+        const geoCodeRes = await axios.get(
+          `https://api.opencagedata.com/geocode/v1/json?q=${lat}+${lng}&key=${openCageKey}&no_annotations=1`
+        );
+
+        if (geoCodeRes.data?.results?.length > 0) {
+          const c = geoCodeRes.data.results[0].components;
+          formattedAddress = [
+            c.suburb || c.neighbourhood || c.village,
+            c.city || c.town || c.village,
+            c.state,
+            c.country,
+          ]
+            .filter(Boolean)
+            .join(", ");
+        }
+      } catch (geoErr) {
+        console.warn("⚠️ Reverse geocode failed:", geoErr.message);
+      }
+    }
 
     // 3️⃣ Handle image upload
     let imageUrl = null;
@@ -261,7 +263,8 @@ const getDeptIssues = async (req, res) => {
         .select("*")
         .in("issue_id", assignedIssueIds);
 
-      if (issueError) return res.status(500).json({ error: issueError.message });
+      if (issueError)
+        return res.status(500).json({ error: issueError.message });
 
       return res.json({
         employee: employee.emp_email,
@@ -273,25 +276,25 @@ const getDeptIssues = async (req, res) => {
     if (employee.position === 1) {
       if (!employee.team_name)
         return res.status(403).json({ error: "Team not set" });
-    
+
       // 1️⃣ Fetch team members
       const { data: teamMembers } = await supabase
         .from("employee_registry")
         .select("emp_id, emp_email, name")
         .eq("team_name", employee.team_name)
         .eq("position", 0);
-    
+
       // 2️⃣ Fetch all issues within radius (using RPC)
       const { data: issues } = await supabase.rpc(
         "get_issues_within_team_radius",
         { p_team_name: employee.team_name }
       );
-    
+
       // 3️⃣ Fetch employee-issue mapping
       const { data: mappings } = await supabase
         .from("employee_issue_map")
         .select("emp_id, issue_id");
-    
+
       // 4️⃣ Attach assigned employees to each issue
       const issuesWithAssignments = issues.map((issue) => {
         const assignedEmployees = mappings
@@ -303,10 +306,10 @@ const getDeptIssues = async (req, res) => {
               : null;
           })
           .filter(Boolean);
-    
+
         return { ...issue, assigned_to: assignedEmployees };
       });
-    
+
       // 5️⃣ Separate unassigned and assigned issues
       const teamWithIssues = teamMembers.map((member) => {
         const memberIssues = issuesWithAssignments.filter((i) =>
@@ -314,12 +317,12 @@ const getDeptIssues = async (req, res) => {
         );
         return { ...member, issues: memberIssues };
       });
-    
+
       const allAssignedIds = mappings.map((m) => m.issue_id);
       const unassigned = issuesWithAssignments.filter(
         (i) => !allAssignedIds.includes(i.issue_id)
       );
-    
+
       if (unassigned.length > 0) {
         teamWithIssues.push({
           emp_id: null,
@@ -328,7 +331,7 @@ const getDeptIssues = async (req, res) => {
           issues: unassigned,
         });
       }
-    
+
       return res.json({ manager: employee.emp_email, team: teamWithIssues });
     }
 
@@ -368,6 +371,132 @@ const getDeptIssues = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
+  }
+};
+
+const agentUpdateIssue = async (req, res) => {
+  console.log("🟢 agentUpdateIssue invoked");
+  try {
+    // 1. Validate Input
+    const { issue_id } = req.params;
+    const fixedImageFile = req.file;
+
+    if (!issue_id || !fixedImageFile) {
+      return res
+        .status(400)
+        .json({ error: "Missing issueId or fixedImage file." });
+    }
+    console.log(`➡️ Received update for issue_id: ${issue_id}`);
+
+    // 2. Upload "Fixed" Image to Supabase Storage
+    const fileName = `resolved-${issue_id}-${Date.now()}`;
+    const { error: uploadError } = await supabase.storage
+      .from("issue-photos")
+      .upload(fileName, fixedImageFile.buffer, {
+        contentType: fixedImageFile.mimetype,
+      });
+
+    if (uploadError) {
+      console.error("❌ Supabase storage upload error:", uploadError.message);
+      throw new Error("Failed to upload fixed image.");
+    }
+
+    const { data: urlData } = supabase.storage
+      .from("issue-photos")
+      .getPublicUrl(fileName);
+    const fixedImageUrl = urlData.publicUrl;
+    console.log("✅ 'Fixed' image uploaded:", fixedImageUrl);
+
+    // 3. Fetch Original Issue Details
+    const { data: originalIssue, error: fetchError } = await supabase
+      .from("issues")
+      .select("issue_id, issue_title, issue_description, image_url, created_by")
+      .eq("issue_id", issue_id)
+      .single();
+
+    if (fetchError || !originalIssue) {
+      console.error("❌ Failed to fetch original issue:", fetchError?.message);
+      return res.status(404).json({ error: "Original issue not found." });
+    }
+    console.log("✅ Fetched original issue:", originalIssue.issue_title);
+
+    // 4. AI Verification with Gemini (NEW RELIABLE METHOD)
+    console.log("🤖 Downloading images to send to Gemini...");
+
+    // Use our helper function to get the image data for both images
+    const originalImagePart = await urlToGenerativePart(
+      originalIssue.image_url
+    );
+    const fixedImagePart = await urlToGenerativePart(fixedImageUrl);
+
+    console.log("🤖 Preparing prompt with inline image data...");
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+    const prompt = {
+      contents: [
+        {
+          role: "user",
+          parts: [
+            {
+              text: `You are an AI verification agent for a civic issue platform. Your task is to determine if a reported issue has been resolved based on two images and its description.
+          
+          Issue Title: "${originalIssue.issue_title}"
+          Issue Description: "${originalIssue.issue_description}"
+
+          Analyze the 'Original Problem Image' (first image) and compare it to the 'Submitted Fix Image' (second image). Decide on a new status: 'resolved' or 'in progress' or 'pending'.
+          
+          Return ONLY a valid JSON object with the keys: "new_status" and "justification".`,
+            },
+            originalImagePart,
+            fixedImagePart,
+          ],
+        },
+      ],
+    };
+
+    const result = await model.generateContent(prompt);
+    const responseText = result.response.text();
+    console.log("📩 Gemini raw response:", responseText);
+
+    const aiResponse = JSON.parse(responseText.replace(/```json\n?|```/g, ""));
+    console.log("✅ Parsed AI response:", aiResponse);
+
+    // 5. Update Issue in Database with AI's Verdict
+    const { data: updatedIssue, error: updateError } = await supabase
+      .from("issues")
+      .update({
+        status: aiResponse.new_status,
+        resolved_image_url: fixedImageUrl,
+        // resolution_notes: aiResponse.justification,
+        // resolved_at: new Date().toISOString(),
+      })
+      .eq("issue_id", issue_id)
+      .select("issue_id, issue_title, created_by")
+      .single();
+
+    if (updateError) {
+      console.error("❌ Supabase update error:", updateError.message);
+      throw new Error("Failed to update issue status in database.");
+    }
+    console.log("✅ Issue status updated in DB to:", aiResponse.new_status);
+
+    // 7. Send Success Response to Frontend
+    res.json({
+      success: true,
+      message: "AI analysis complete and issue updated.",
+      aiUpdate: {
+        status: aiResponse.new_status,
+        justification: aiResponse.justification,
+      },
+    });
+  } catch (err) {
+    console.error(
+      "🔥 Unhandled error in agentUpdateIssue:",
+      err.stack || err.message
+    );
+    res
+      .status(500)
+      .json({ error: err.message || "An internal server error occurred." });
   }
 };
 // Add this function to issuesController.js
@@ -497,7 +626,9 @@ Image: ${report.image_url}`,
       console.log("✅ Parsed AI response:", parsed);
     } catch (parseErr) {
       console.error("❌ JSON parse error:", parseErr.message);
-      return res.status(500).json({ error: "Invalid AI response", raw: rawText });
+      return res
+        .status(500)
+        .json({ error: "Invalid AI response", raw: rawText });
     }
 
     // 4. Update Supabase
@@ -528,12 +659,15 @@ Image: ${report.image_url}`,
       GeminiAPIResponse: parsed,
     });
   } catch (err) {
-    console.error("🔥 Unhandled classification error:", err.stack || err.message);
+    console.error(
+      "🔥 Unhandled classification error:",
+      err.stack || err.message
+    );
     res.status(500).json({ error: "Internal server error (unhandled)" });
   }
 };
-    // 3. Update Supabase issues table
-   
+// 3. Update Supabase issues table
+
 // Assign an issue to an employee
 const assignIssueToEmployee = async (req, res) => {
   try {
@@ -569,7 +703,10 @@ const assignIssueToEmployee = async (req, res) => {
     const { data: existingMappings } = await supabase
       .from("employee_issue_map")
       .select("emp_id, issue_id")
-      .in("emp_id", assignable.map((e) => e.emp_id))
+      .in(
+        "emp_id",
+        assignable.map((e) => e.emp_id)
+      )
       .eq("issue_id", issueId);
 
     const existingKeys = new Set(
@@ -643,6 +780,6 @@ module.exports = {
   classifyReport,
   getDeptIssues,
   updateIssueStatus,
-  fetchAddress,
+  agentUpdateIssue,
   createIssueWithLocation,
 };

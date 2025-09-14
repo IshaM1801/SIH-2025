@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +9,7 @@ import { Camera, FileText, Image as ImageIcon, X, CheckCircle, AlertTriangle, Lo
 import PWALayout from "@/components/ui/PWALayout";
 
 function ReportIssuePage() {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({ issue_title: "", issue_description: "" });
   const [selectedImage, setSelectedImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
@@ -15,43 +17,83 @@ function ReportIssuePage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [coordinates, setCoordinates] = useState({ latitude: null, longitude: null });
+  const [address, setAddress] = useState(""); 
+  const [addressLoading, setAddressLoading] = useState(false);
 
-  // --- Fetch user location only ---
+  // ✅ Simplified location fetching - only get coordinates
   useEffect(() => {
-    if (!navigator.geolocation) {
-      console.warn("⚠️ Geolocation not supported");
-      return;
-    }
+    const fetchLocation = () => {
+      if (navigator.geolocation) {
+        setAddressLoading(true);
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const { latitude, longitude } = position.coords;
+            console.log("📍 Fetched coordinates:", latitude, longitude);
 
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        console.log("📍 Fetched coordinates:", latitude, longitude);
+            // Store coordinates
+            const coords = { latitude, longitude };
+            setCoordinates(coords);
+            localStorage.setItem("coords", JSON.stringify(coords));
+            console.log("✅ Coordinates saved:", coords);
+            
+            // ✅ Fetch address from backend using the shared function
+            fetchAddressFromBackend(latitude, longitude);
+          },
+          (err) => {
+            console.warn("⚠️ Geolocation error:", err.message);
+            setAddressLoading(false);
+            setAddress("Location access denied");
+          },
+          { enableHighAccuracy: true, timeout: 10000 }
+        );
+      } else {
+        console.warn("⚠️ Geolocation is not supported by this browser");
+        setAddress("Geolocation not supported");
+      }
+    };
 
-        const coords = { latitude, longitude };
-        setCoordinates(coords);
-        localStorage.setItem("coords", JSON.stringify(coords));
-        console.log("✅ Coordinates saved:", coords);
-      },
-      (err) => {
-        console.warn("⚠️ Geolocation error:", err.message);
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
+    fetchLocation();
   }, []);
+
+  // ✅ Separate function to fetch address (for preview purposes)
+  const fetchAddressFromBackend = async (latitude, longitude) => {
+    try {
+      const token = localStorage.getItem("token");
+      
+      const res = await fetch("http://localhost:5001/issues/fetch-address", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ latitude, longitude }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to fetch address");
+
+      console.log("🏠 Address from backend:", data.address);
+      setAddress(data.address);
+    } catch (err) {
+      console.error("❌ Error fetching address:", err);
+      setAddress("Unable to fetch address");
+    } finally {
+      setAddressLoading(false);
+    }
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData(prev => ({ ...prev, [name]: value }));
     setError("");
     setSuccess("");
   };
 
   const handleImageCapture = () => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = "image/*";
-    input.capture = "environment";
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.capture = 'environment';
     input.onchange = (e) => {
       const file = e.target.files[0];
       if (file) {
@@ -65,9 +107,9 @@ function ReportIssuePage() {
   };
 
   const handleImageSelect = () => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = "image/*";
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
     input.onchange = (e) => {
       const file = e.target.files[0];
       if (file) {
@@ -84,106 +126,93 @@ function ReportIssuePage() {
     setSelectedImage(null);
     setImagePreview(null);
   };
+  
+  // ✅ Updated submit handler - uses enhanced create route
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+    setSuccess("");
 
-  // --- Submit issue
- // --- Submit issue
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  setLoading(true);
-  setError("");
-  setSuccess("");
-
-  if (!formData.issue_title || !formData.issue_description) {
-    setError("All fields are required");
-    setLoading(false);
-    return;
-  }
-
-  try {
-    const token = localStorage.getItem("token");
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
-
-    if (!token || !user?.id) {
-      setError("User is not logged in or token not found");
+    if (!formData.issue_title || !formData.issue_description) {
+      setError("All fields are required");
       setLoading(false);
       return;
     }
 
-    const storedCoords = JSON.parse(localStorage.getItem("coords") || "{}");
-
-    const payload = new FormData();
-    payload.append("issue_title", formData.issue_title);
-    payload.append("issue_description", formData.issue_description);
-    payload.append("created_by", user.id);
-    if (selectedImage) payload.append("photo", selectedImage);
-    if (storedCoords.latitude && storedCoords.longitude) {
-      payload.append("latitude", storedCoords.latitude);
-      payload.append("longitude", storedCoords.longitude);
-    }
-
-    console.log("📡 Submitting /issues/create:", payload);
-
-    const response = await fetch("http://localhost:5001/issues/create", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-      body: payload,
-    });
-
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "Issue submission failed");
-
-    console.log("✅ /issues/create response:", data);
-
-    // --- Classification
-    const classifyRes = await fetch("http://localhost:5001/issues/classify-report", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ reportId: data.issue.issue_id }),
-    });
-
-    const classifyData = await classifyRes.json();
-    if (!classifyRes.ok) throw new Error(classifyData.error || "Classification failed");
-
-    console.log("📂 /issues/classify-report response:", classifyData);
-
-    // --- Fetch address from OpenCage (frontend)
-    let areaName = "unknown area";
     try {
-      const openCageKey = "ceefcaa44fd14d259322d6c1000b06c3"; // or from .env
-      const coordsToUse = storedCoords.latitude
-        ? `${storedCoords.latitude},${storedCoords.longitude}`
-        : `${data.location.latitude},${data.location.longitude}`;
+      const token = localStorage.getItem("token");
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
 
-      const geoRes = await fetch(
-        `https://api.opencagedata.com/geocode/v1/json?q=${coordsToUse}&key=${openCageKey}&no_annotations=1`
-      );
-      const geoData = await geoRes.json();
-      if (geoData?.results?.length > 0) {
-        const c = geoData.results[0].components;
-        areaName = c.suburb || c.neighbourhood || c.village || c.city || c.town || "your area";
+      if (!token || !user?.id) {
+        setError("User is not logged in or token not found");
+        setLoading(false);
+        return;
       }
-    } catch (geoErr) {
-      console.warn("⚠️ OpenCage fetch failed:", geoErr.message);
+
+      const storedCoords = JSON.parse(localStorage.getItem("coords") || "{}");
+
+      const payload = new FormData();
+      payload.append("issue_title", formData.issue_title);
+      payload.append("issue_description", formData.issue_description);
+      payload.append("created_by", user.id);
+      if (selectedImage) payload.append("photo", selectedImage);
+      if (storedCoords.latitude && storedCoords.longitude) {
+        payload.append("latitude", storedCoords.latitude);
+        payload.append("longitude", storedCoords.longitude);
+      }
+
+      // ✅ Single API call to enhanced create route
+      const response = await fetch("http://localhost:5001/issues/create", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: payload,
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Issue submission failed");
+
+      console.log("✅ Issue created:", data);
+
+      // ✅ Get address from create response (if available) or use preview address
+      const resolvedAddress = data.location?.address || address || "your area";
+
+      // Classification (optional but recommended)
+      const classifyRes = await fetch("http://localhost:5001/issues/classify-report", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ reportId: data.issue.issue_id }),
+      });
+
+      const classifyData = await classifyRes.json();
+      if (!classifyRes.ok) {
+        console.warn("Classification failed:", classifyData.error);
+        // Don't fail the entire submission if classification fails
+        setSuccess(`✅ Your report has been submitted successfully at ${resolvedAddress}. Classification pending.`);
+      } else {
+        setSuccess(`✅ Your report has been submitted to the ${classifyData.department} department at ${resolvedAddress}.`);
+      }
+
+      // Reset form
+      setFormData({ issue_title: "", issue_description: "" });
+      setSelectedImage(null);
+      setImagePreview(null);
+
+      // ✅ Optional: Navigate to reports page after success
+      setTimeout(() => {
+        navigate("/my-reports");
+      }, 3000);
+
+    } catch (err) {
+      console.error("❌ Submission error:", err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
-
-    setSuccess(
-      `✅ Your report has been submitted to the ${classifyData.department} department at ${areaName}.`
-    );
-
-    // Reset form
-    setFormData({ issue_title: "", issue_description: "" });
-    setSelectedImage(null);
-    setImagePreview(null);
-  } catch (err) {
-    console.error("❌ Error submitting issue:", err);
-    setError(err.message);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   return (
     <PWALayout title="Report Issue" showNotifications={true}>
@@ -193,22 +222,34 @@ const handleSubmit = async (e) => {
           <p className="text-gray-600">Help make your city better by reporting civic issues</p>
         </div>
 
-        {/* Location & Coordinates */}
+        {/* ✅ Enhanced Location Display */}
         {coordinates.latitude && coordinates.longitude && (
           <Card className="mb-6 border-blue-200 bg-blue-50">
-            <CardContent>
+            <CardContent className="p-4">
               <div className="space-y-3">
+                {/* ✅ Address Section - Display prominently */}
                 <div className="flex items-start space-x-3">
                   <MapPin className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
                   <div className="flex-1">
                     <p className="text-sm font-medium text-gray-700 mb-1">Current Location</p>
-                    <p className="text-green-700 font-medium">Address will be resolved by backend</p>
+                    {addressLoading ? (
+                      <div className="flex items-center space-x-2">
+                        <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
+                        <p className="text-blue-700">Fetching address...</p>
+                      </div>
+                    ) : address ? (
+                      <p className="text-green-700 font-medium">{address}</p>
+                    ) : (
+                      <p className="text-gray-500">Address not available</p>
+                    )}
                   </div>
                 </div>
+                
+                {/* ✅ Fixed Coordinates Section */}
                 <div className="flex items-center space-x-3 pt-2 border-t border-blue-200">
-                  <MapPin className="w-5 h-5 text-blue-500 flex-shrink-0" />
+                  <MapPin className="w-4 h-4 text-blue-500 flex-shrink-0" />
                   <div className="flex-1">
-                    <p className="text-xs text-gray-600 mb-1">GPS Coordinates</p>
+                    <p className="mt-3 text-xs text-gray-600 mb-1">GPS Coordinates</p>
                     <p className="text-blue-700 text-sm font-mono">
                       {coordinates.latitude.toFixed(6)}, {coordinates.longitude.toFixed(6)}
                     </p>
@@ -219,7 +260,6 @@ const handleSubmit = async (e) => {
           </Card>
         )}
 
-        {/* Error & Success */}
         {error && (
           <Card className="mb-6 border-red-200 bg-red-50">
             <CardContent className="p-4 flex items-center space-x-2">
@@ -228,6 +268,7 @@ const handleSubmit = async (e) => {
             </CardContent>
           </Card>
         )}
+
         {success && (
           <Card className="mb-6 border-green-200 bg-green-50">
             <CardContent className="p-4 flex items-center space-x-2">
@@ -237,7 +278,6 @@ const handleSubmit = async (e) => {
           </Card>
         )}
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Issue Details */}
           <Card>

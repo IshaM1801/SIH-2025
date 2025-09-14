@@ -88,7 +88,7 @@ const Navbar = ({ adminData }) => {
     };
 
     fetchKpiData();
-  }, [handleLogout]); // The empty array [] ensures this effect runs only once
+  }, []); // The empty array [] ensures this effect runs only once
 
   const getGreeting = () => {
     const hours = new Date().getHours();

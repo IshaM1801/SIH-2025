@@ -15,10 +15,17 @@ import {
   Upload,
   Shield,
   Trash2,
+  Loader2,
+  RefreshCw
 } from "lucide-react";
 
 import axios from "axios";
 import { jwtDecode } from "jwt-decode";
+import PWALayout from "@/components/ui/PWALayout";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+
 // --- Configuration ---
 const API_BASE_URL = "http://localhost:5001";
 
@@ -48,10 +55,9 @@ const getCurrentUser = () => {
   if (!token) return null;
   try {
     const decoded = jwtDecode(token);
-    // From your authMiddleware, we know employees have 'email' and users will have 'sub' (for user_id)
     return {
       isEmployee: decoded.role === "employee",
-      id: decoded.sub, // For Supabase JWT, user ID is in 'sub' claim
+      id: decoded.sub,
       email: decoded.email,
     };
   } catch (e) {
@@ -64,22 +70,22 @@ const getCurrentUser = () => {
 const STATUS_CONFIG = {
   pending: {
     label: "Pending",
-    color: "bg-yellow-100 text-yellow-700 border-yellow-200",
+    color: "bg-yellow-100 text-yellow-800",
     icon: Clock,
   },
   "in-progress": {
     label: "In Progress",
-    color: "bg-blue-100 text-blue-700 border-blue-200",
+    color: "bg-blue-100 text-blue-800",
     icon: Clock,
   },
   resolved: {
     label: "Resolved",
-    color: "bg-green-100 text-green-700 border-green-200",
+    color: "bg-green-100 text-green-800",
     icon: CheckCircle,
   },
   rejected: {
     label: "Rejected",
-    color: "bg-red-100 text-red-700 border-red-200",
+    color: "bg-red-100 text-red-800",
     icon: XCircle,
   },
 };
@@ -88,15 +94,15 @@ const STATUS_CONFIG = {
 const SEVERITY_CONFIG = {
   low: {
     label: "LOW",
-    color: "bg-green-50 text-green-600 border-green-200",
+    color: "bg-green-100 text-green-800",
   },
   medium: {
     label: "MEDIUM",
-    color: "bg-yellow-50 text-yellow-600 border-yellow-200",
+    color: "bg-yellow-100 text-yellow-800",
   },
   high: {
     label: "HIGH",
-    color: "bg-red-50 text-red-600 border-red-200",
+    color: "bg-red-100 text-red-800",
   },
 };
 
@@ -106,26 +112,21 @@ const StatusPill = ({ status }) => {
   const Icon = config.icon;
 
   return (
-    <div
-      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium border ${config.color}`}
-    >
-      <Icon size={14} />
+    <Badge variant="secondary" className={`text-xs ${config.color}`}>
+      <Icon className="w-3 h-3 mr-1" />
       {config.label}
-    </div>
+    </Badge>
   );
 };
 
 // Severity Badge Component
 const SeverityBadge = ({ severity }) => {
-  const config =
-    SEVERITY_CONFIG[severity?.toLowerCase()] || SEVERITY_CONFIG.medium;
+  const config = SEVERITY_CONFIG[severity?.toLowerCase()] || SEVERITY_CONFIG.medium;
 
   return (
-    <div
-      className={`inline-flex items-center px-2 py-1 rounded text-xs font-bold border ${config.color}`}
-    >
+    <Badge variant="outline" className={`text-xs ${config.color}`}>
       {config.label}
-    </div>
+    </Badge>
   );
 };
 
@@ -136,13 +137,11 @@ const ImageUpload = ({ onImageSelect, selectedImage, onRemoveImage }) => {
   const handleFileSelect = (event) => {
     const file = event.target.files[0];
     if (file) {
-      // Validate file type
       if (!file.type.startsWith("image/")) {
         alert("Please select an image file");
         return;
       }
 
-      // Validate file size (5MB limit)
       if (file.size > 5 * 1024 * 1024) {
         alert("Image size should be less than 5MB");
         return;
@@ -177,61 +176,32 @@ const ImageUpload = ({ onImageSelect, selectedImage, onRemoveImage }) => {
           </button>
         </div>
       ) : (
-        <button
-          onClick={() => fileInputRef.current?.click()}
+        <Button
           type="button"
-          className="flex items-center gap-2 px-3 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          variant="outline"
+          size="sm"
+          onClick={() => fileInputRef.current?.click()}
+          className="flex items-center gap-2"
         >
           <Upload size={16} />
-          <span className="text-sm">Add Image</span>
-        </button>
+          Add Image
+        </Button>
       )}
     </div>
   );
 };
 
 // Comment Component
-const CommentItem = ({ comment, currentUser, onDelete, onEdit }) => {
-  // Added currentUser and onEdit
+const CommentItem = ({ comment, currentUser, onDelete }) => {
   const isEmployeeComment = !!comment.employee_id;
   const [imageError, setImageError] = useState(false);
 
   const canDelete = () => {
     if (!currentUser) return false;
-    // An employee can delete any user's comment
     if (currentUser.isEmployee && !isEmployeeComment) {
       return true;
     }
-    // Anyone can delete their own comment
-    if (
-      currentUser.isEmployee &&
-      currentUser.email === comment.employee_registry?.emp_email
-    ) {
-      // This check is a bit tricky without the email in the payload. Let's rely on employee_id.
-      // A better approach is to have the backend return the employee_id and user_id directly.
-      // Let's assume the main delete logic is on the backend. Here we handle the UI.
-      return isEmployeeComment;
-    }
-    if (!currentUser.isEmployee && currentUser.id === comment.user_id) {
-      return true;
-    }
-    return false;
-  };
-
-  const canEdit = () => {
-    if (!currentUser) return false;
-    // An employee can edit any user's comment
-    if (currentUser.isEmployee && !isEmployeeComment) {
-      return true;
-    }
-    // Anyone can edit their own comment
-    if (
-      currentUser.isEmployee &&
-      currentUser.email === comment.employee_registry?.emp_email
-    ) {
-      // This check is a bit tricky without the email in the payload. Let's rely on employee_id.
-      // A better approach is to have the backend return the employee_id and user_id directly.
-      // Let's assume the main delete logic is on the backend. Here we handle the UI.
+    if (currentUser.isEmployee && currentUser.email === comment.employee_registry?.emp_email) {
       return isEmployeeComment;
     }
     if (!currentUser.isEmployee && currentUser.id === comment.user_id) {
@@ -241,67 +211,57 @@ const CommentItem = ({ comment, currentUser, onDelete, onEdit }) => {
   };
 
   return (
-    <div
-      className={`p-4 rounded-lg border-l-4 ${
-        isEmployeeComment
-          ? "bg-blue-50 border-l-blue-500 border border-blue-200"
-          : "bg-gray-100 border-l-gray-400"
-      }`}
-    >
-      <div className="flex justify-between items-start mb-2">
-        <div className="flex items-center gap-2">
-          <p
-            className={`font-bold text-sm ${
-              isEmployeeComment ? "text-blue-800" : "text-gray-800"
-            }`}
-          >
-            {comment.commenter_name || "Anonymous"}
-          </p>
-          {isEmployeeComment && (
-            <div className="flex items-center gap-1 bg-blue-100 px-2 py-1 rounded-full">
-              <Shield size={12} className="text-blue-600" />
-              <span className="text-xs font-medium text-blue-700">
-                Official
-              </span>
-            </div>
-          )}
-          {comment.employee_registry?.dept_name && (
-            <span className="text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded">
-              {comment.employee_registry.dept_name}
+    <Card className={`mb-3 ${isEmployeeComment ? 'border-l-4 border-l-blue-500 bg-blue-50' : ''}`}>
+      <CardContent className="p-4">
+        <div className="flex justify-between items-start mb-2">
+          <div className="flex items-center gap-2">
+            <span className={`font-medium text-sm ${isEmployeeComment ? "text-blue-800" : "text-gray-800"}`}>
+              {comment.commenter_name || "Anonymous"}
             </span>
+            {isEmployeeComment && (
+              <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700">
+                <Shield size={12} className="mr-1" />
+                Official
+              </Badge>
+            )}
+            {comment.employee_registry?.dept_name && (
+              <Badge variant="outline" className="text-xs">
+                {comment.employee_registry.dept_name}
+              </Badge>
+            )}
+          </div>
+
+          {canDelete() && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onDelete(comment.comment_id)}
+              className="text-red-500 hover:text-red-700 p-1 h-auto"
+            >
+              <Trash2 size={14} />
+            </Button>
           )}
         </div>
 
-        {/* --- MODIFIED DELETE BUTTON LOGIC --- */}
-        {canDelete() && (
-          <button
-            onClick={() => onDelete(comment.comment_id)}
-            className="text-red-500 hover:text-red-700 opacity-70 hover:opacity-100"
-            title="Delete comment"
-          >
-            <Trash2 size={14} />
-          </button>
+        <p className="text-gray-700 text-sm mb-2">{comment.content}</p>
+
+        {comment.image_url && !imageError && (
+          <div className="mb-2">
+            <img
+              src={comment.image_url}
+              alt="Comment attachment"
+              className="max-w-64 max-h-48 rounded-lg border cursor-pointer hover:opacity-90 transition-opacity"
+              onError={() => setImageError(true)}
+              onClick={() => window.open(comment.image_url, "_blank")}
+            />
+          </div>
         )}
-      </div>
 
-      <p className="text-gray-700 text-sm mb-2">{comment.content}</p>
-
-      {comment.image_url && !imageError && (
-        <div className="mb-2">
-          <img
-            src={comment.image_url}
-            alt="Comment attachment"
-            className="max-w-64 max-h-48 rounded-lg border cursor-pointer hover:opacity-90 transition-opacity"
-            onError={() => setImageError(true)}
-            onClick={() => window.open(comment.image_url, "_blank")}
-          />
-        </div>
-      )}
-
-      <p className="text-xs text-gray-500">
-        {new Date(comment.created_at).toLocaleString()}
-      </p>
-    </div>
+        <p className="text-xs text-gray-500">
+          {new Date(comment.created_at).toLocaleString()}
+        </p>
+      </CardContent>
+    </Card>
   );
 };
 
@@ -314,7 +274,6 @@ const Comments = ({ issueId }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  // Get current user info once
   const currentUser = getCurrentUser();
   const isAdmin = currentUser?.isEmployee;
 
@@ -322,7 +281,6 @@ const Comments = ({ issueId }) => {
     setIsLoading(true);
     try {
       const response = await axiosInstance.get(`/issues/comments/${issueId}`);
-      // Sort comments: Employee comments first, then by creation date
       const sortedComments = response.data.sort((a, b) => {
         const aIsAdmin = !!a.employee_id;
         const bIsAdmin = !!b.employee_id;
@@ -377,9 +335,8 @@ const Comments = ({ issueId }) => {
       let imageUrl = null;
       if (selectedImage) {
         imageUrl = await uploadImage(selectedImage);
-        console.log("URL received from image upload:", imageUrl);
       }
-      // The backend will figure out if the user is an employee from the token
+
       const response = await axiosInstance.post(
         `/comments/issues/comments/${issueId}`,
         {
@@ -388,7 +345,6 @@ const Comments = ({ issueId }) => {
         }
       );
 
-      // Just add the new comment to the top and re-sort
       setComments((prev) =>
         [response.data, ...prev].sort((a, b) => {
           const aIsAdmin = !!a.employee_id;
@@ -425,88 +381,96 @@ const Comments = ({ issueId }) => {
     }
   };
 
-  if (isLoading) return <p className="text-gray-500">Loading comments...</p>;
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="p-4 text-center">
+          <Loader2 className="w-6 h-6 text-gray-400 mx-auto mb-2 animate-spin" />
+          <p className="text-gray-500">Loading comments...</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
-    <div className="mt-6">
-      <h3 className="text-xl font-bold mb-4 text-gray-800 flex items-center gap-2">
-        <MessageSquare size={20} />
-        Comments ({comments.length})
-      </h3>
-
-      <div className="space-y-4 mb-6 max-h-96 overflow-y-auto pr-2">
-        {comments.length > 0 ? (
-          comments.map((comment) => (
-            <CommentItem
-              key={comment.comment_id}
-              comment={comment}
-              currentUser={currentUser}
-              onDelete={handleDeleteComment}
-            />
-          ))
-        ) : (
-          <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-            <MessageSquare className="mx-auto mb-2 text-gray-400" size={32} />
-            <p className="text-gray-500">
-              No comments yet. Be the first to comment!
-            </p>
-          </div>
-        )}
-      </div>
-
-      <form onSubmit={handleCommentSubmit} className="space-y-3">
-        <div>
-          <textarea
-            value={newComment}
-            onChange={(e) => setNewComment(e.target.value)}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-            placeholder={`Add a ${isAdmin ? "response" : "comment"}...`}
-            rows="3"
-            disabled={isSubmitting}
-          />
-
-          <ImageUpload
-            onImageSelect={setSelectedImage}
-            selectedImage={selectedImage}
-            onRemoveImage={() => setSelectedImage(null)}
-          />
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg flex items-center gap-2">
+          <MessageSquare className="w-5 h-5" />
+          Comments ({comments.length})
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-3 max-h-80 overflow-y-auto">
+          {comments.length > 0 ? (
+            comments.map((comment) => (
+              <CommentItem
+                key={comment.comment_id}
+                comment={comment}
+                currentUser={currentUser}
+                onDelete={handleDeleteComment}
+              />
+            ))
+          ) : (
+            <div className="text-center py-6 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+              <MessageSquare className="mx-auto mb-2 text-gray-400" size={32} />
+              <p className="text-gray-500">No comments yet. Be the first to comment!</p>
+            </div>
+          )}
         </div>
 
-        {error && (
-          <div className="text-red-600 text-sm bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-            {error}
-          </div>
-        )}
+        <form onSubmit={handleCommentSubmit} className="space-y-3 pt-4 border-t">
+          <div>
+            <textarea
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+              placeholder={`Add a ${isAdmin ? "response" : "comment"}...`}
+              rows="3"
+              disabled={isSubmitting}
+            />
 
-        <button
-          type="submit"
-          disabled={isSubmitting || (!newComment.trim() && !selectedImage)}
-          className={`flex items-center gap-2 font-medium py-3 px-6 rounded-lg transition duration-300 ${
-            isAdmin
-              ? "bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-400"
-              : "bg-green-600 text-white hover:bg-green-700 disabled:bg-green-400"
-          } disabled:cursor-not-allowed`}
-        >
-          {isSubmitting ? (
-            <>
-              <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
-              Posting...
-            </>
-          ) : (
-            <>
-              <MessageSquare size={16} />
-              {isAdmin ? "Post Response" : "Post Comment"}
-            </>
+            <ImageUpload
+              onImageSelect={setSelectedImage}
+              selectedImage={selectedImage}
+              onRemoveImage={() => setSelectedImage(null)}
+            />
+          </div>
+
+          {error && (
+            <div className="text-red-600 text-sm bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              {error}
+            </div>
           )}
-        </button>
-      </form>
-    </div>
+
+          <Button
+            type="submit"
+            disabled={isSubmitting || (!newComment.trim() && !selectedImage)}
+            className={`w-full ${isAdmin ? "bg-blue-600 hover:bg-blue-700" : "bg-green-600 hover:bg-green-700"}`}
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Posting...
+              </>
+            ) : (
+              <>
+                <MessageSquare className="w-4 h-4 mr-2" />
+                {isAdmin ? "Post Response" : "Post Comment"}
+              </>
+            )}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
   );
 };
 
+// ✅ Updated Issue Modal with mobile-friendly design
 const IssueModal = ({ issue, onClose }) => {
   const [upvotes, setUpvotes] = useState(issue?.upvotes || 0);
   const [copied, setCopied] = useState(false);
+  
   if (!issue) return null;
 
   const copyCoordinates = (value) => {
@@ -518,249 +482,188 @@ const IssueModal = ({ issue, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 mt-0 pt-0 bg-black/50 z-50 flex justify-center items-center p-4 animate-in fade-in-0 duration-300">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 bg-black/50 z-50 flex justify-center items-start p-4 pt-16 animate-in fade-in-0 duration-300">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="bg-blue-600 text-white p-6 relative">
-          <div className="flex justify-between items-start">
-            <div className="flex items-center gap-3">
-              <h2 className="text-2xl font-bold">Report Details</h2>
-              <div className="bg-yellow-500 text-yellow-900 px-3 py-1 rounded-full text-sm font-medium">
-                Reported
-              </div>
-            </div>
-            <button
-              onClick={onClose}
-              className="text-white/80 hover:text-white text-2xl font-bold p-1 rounded-lg hover:bg-white/10 transition"
-            >
-              <X size={24} />
-            </button>
+        <div className="bg-blue-600 text-white p-4 flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-bold">Report Details</h2>
+            <StatusPill status={issue.status} />
           </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+            className="text-white hover:bg-white/20 p-1"
+          >
+            <X size={20} />
+          </Button>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6">
-            {/* Basic Information */}
-            <div className="lg:col-span-2 space-y-6">
-              <div className="bg-gray-50 rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-6 h-6 bg-blue-100 rounded flex items-center justify-center">
-                    <AlertTriangle size={14} className="text-blue-600" />
-                  </div>
-                  <h3 className="font-semibold text-gray-800">
-                    Basic Information
-                  </h3>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                  <div className="flex items-center gap-3">
-                    <MapPin size={16} className="text-gray-500 flex-shrink-0" />
-                    <div>
-                      <p className="text-sm text-gray-500">Location</p>
-                      <p className="font-medium text-gray-800 text-sm">
-                        {issue.address_component || "Unknown Location"}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <Calendar
-                      size={16}
-                      className="text-gray-500 flex-shrink-0"
-                    />
-                    <div>
-                      <p className="text-sm text-gray-500">Date Reported</p>
-                      <p className="font-medium text-gray-800 text-sm">
-                        {new Date(issue.created_at).toLocaleDateString("en-GB")}{" "}
-                        at{" "}
-                        {new Date(issue.created_at).toLocaleTimeString(
-                          "en-US",
-                          {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                            hour12: true,
-                          }
-                        )}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <User size={16} className="text-gray-500 flex-shrink-0" />
-                    <div>
-                      <p className="text-sm text-gray-500">Reported By</p>
-                      <p className="font-medium text-gray-800 text-sm">
-                        {issue.profiles?.name || "Unknown"}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <ThumbsUp
-                      size={16}
-                      className="text-gray-500 flex-shrink-0"
-                    />
-                    <div>
-                      <p className="text-sm text-gray-500">Community Support</p>
-                      <p className="font-medium text-blue-600 text-sm">
-                        {upvotes} upvotes
-                      </p>
-                    </div>
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {/* Basic Information */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5" />
+                {issue.issue_title}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 gap-3">
+                <div className="flex items-center gap-3">
+                  <MapPin className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs text-gray-500">Location</p>
+                    <p className="text-sm font-medium">{issue.address_component || "Unknown Location"}</p>
                   </div>
                 </div>
 
-                <div className="mb-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <AlertTriangle size={16} className="text-gray-500" />
-                    <span className="text-sm text-gray-500">
-                      Severity Level
-                    </span>
-                  </div>
-                  <SeverityBadge severity={issue.priority || "high"} />
-                </div>
-
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-4 h-4 bg-gray-400 rounded"></div>
-                    <span className="text-sm text-gray-500">Description</span>
-                  </div>
-                  <div className="bg-white p-4 rounded-lg border">
-                    <p className="text-gray-700 text-sm leading-relaxed">
-                      {issue.issue_description}
+                <div className="flex items-center gap-3">
+                  <Calendar className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs text-gray-500">Date Reported</p>
+                    <p className="text-sm font-medium">
+                      {new Date(issue.created_at).toLocaleDateString("en-GB")} at{" "}
+                      {new Date(issue.created_at).toLocaleTimeString("en-US", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        hour12: true,
+                      })}
                     </p>
                   </div>
                 </div>
+
+                <div className="flex items-center gap-3">
+                  <User className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs text-gray-500">Reported By</p>
+                    <p className="text-sm font-medium">{issue.profiles?.name || "Unknown"}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <ThumbsUp className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs text-gray-500">Community Support</p>
+                    <p className="text-sm font-medium text-blue-600">{upvotes} upvotes</p>
+                  </div>
+                </div>
               </div>
 
-              {issue.image_url && (
-                <div>
-                  <h3 className="font-semibold text-gray-800 mb-3">
-                    Issue Photo
-                  </h3>
-                  <img
-                    src={issue.image_url}
-                    alt="Issue"
-                    className="rounded-lg w-full h-64 object-cover border"
-                  />
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle className="w-4 h-4 text-gray-500" />
+                  <span className="text-sm text-gray-500">Severity Level</span>
+                </div>
+                <SeverityBadge severity={issue.priority || "high"} />
+              </div>
+
+              <div>
+                <p className="text-sm text-gray-500 mb-2">Description</p>
+                <div className="bg-gray-50 p-3 rounded-lg border">
+                  <p className="text-gray-700 text-sm leading-relaxed">
+                    {issue.issue_description}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Issue Photo */}
+          {issue.image_url && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Issue Photo</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <img
+                  src={issue.image_url}
+                  alt="Issue"
+                  className="rounded-lg w-full h-48 object-cover border"
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Location Details */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <MapPin className="w-5 h-5" />
+                Location Details
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div>
+                <label className="text-sm text-gray-500">Latitude:</label>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="font-mono text-sm bg-gray-50 px-2 py-1 rounded border flex-1">
+                    {issue.latitude || "17.333433"}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => copyCoordinates(issue.latitude || "17.333433")}
+                    className="p-2"
+                  >
+                    <Copy size={14} />
+                  </Button>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm text-gray-500">Longitude:</label>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="font-mono text-sm bg-gray-50 px-2 py-1 rounded border flex-1">
+                    {issue.longitude || "76.854918"}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => copyCoordinates(issue.longitude || "76.854918")}
+                    className="p-2"
+                  >
+                    <Copy size={14} />
+                  </Button>
+                </div>
+              </div>
+
+              {copied && (
+                <div className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
+                  Copied to clipboard!
                 </div>
               )}
 
-              <Comments issueId={issue.issue_id} isAdmin={true} />
-            </div>
+              <Button
+                onClick={() => setUpvotes((prev) => prev + 1)}
+                className="w-full bg-blue-600 hover:bg-blue-700"
+              >
+                <ThumbsUp className="w-4 h-4 mr-2" />
+                Support This Issue
+              </Button>
+            </CardContent>
+          </Card>
 
-            {/* Location Details Sidebar */}
-            <div className="space-y-4">
-              <div className="bg-gray-50 rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-4">
-                  <MapPin className="text-blue-600" size={20} />
-                  <h3 className="font-semibold text-gray-800">
-                    Location Details
-                  </h3>
-                </div>
-
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-sm text-gray-500">Latitude:</label>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="font-mono text-sm bg-white px-2 py-1 rounded border flex-1">
-                        {issue.latitude || "17.333433"}
-                      </span>
-                      <button
-                        onClick={() =>
-                          copyCoordinates(issue.latitude || "17.333433")
-                        }
-                        className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                        title="Copy latitude"
-                      >
-                        <Copy size={14} />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-sm text-gray-500">Longitude:</label>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="font-mono text-sm bg-white px-2 py-1 rounded border flex-1">
-                        {issue.longitude || "76.854918"}
-                      </span>
-                      <button
-                        onClick={() =>
-                          copyCoordinates(issue.longitude || "76.854918")
-                        }
-                        className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                        title="Copy longitude"
-                      >
-                        <Copy size={14} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {copied && (
-                  <div className="mt-2 text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
-                    Copied to clipboard!
-                  </div>
-                )}
-              </div>
-
-              <div className="bg-gray-50 rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="w-5 h-5 bg-blue-100 rounded flex items-center justify-center">
-                    <User size={12} className="text-blue-600" />
-                  </div>
-                  <h3 className="font-semibold text-gray-800">
-                    Tagged Authorities
-                  </h3>
-                </div>
-                <p className="text-sm text-gray-500">
-                  No authorities tagged yet
-                </p>
-              </div>
-
-              <div className="bg-gray-50 rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="w-5 h-5 bg-blue-100 rounded flex items-center justify-center">
-                    <AlertTriangle size={12} className="text-blue-600" />
-                  </div>
-                  <h3 className="font-semibold text-gray-800">Actions</h3>
-                </div>
-                <button
-                  onClick={() => setUpvotes((prev) => prev + 1)}
-                  className="w-full bg-blue-600 text-white text-sm font-medium py-2 px-4 rounded-lg hover:bg-blue-700 transition duration-200"
-                >
-                  <ThumbsUp size={14} className="inline mr-2" />
-                  Support This Issue
-                </button>
-              </div>
-            </div>
-          </div>
+          {/* Comments */}
+          <Comments issueId={issue.issue_id} />
         </div>
       </div>
     </div>
   );
 };
 
-// --- Main Application Component ---
-
-const CitizenCommunication = () => {
+// ✅ Main Component with PWALayout
+const CommunityIssues = () => {
   const [issues, setIssues] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedIssue, setSelectedIssue] = useState(null);
   const [statusFilter, setStatusFilter] = useState("all");
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const token = getAuthToken();
-
-  useEffect(() => {
-    const token = getAuthToken();
-    if (token) {
-      setIsLoggedIn(true);
-    }
-  }, []);
 
   const fetchIssues = useCallback(async () => {
     setIsLoading(true);
-    const token = getAuthToken(); // Get token at the time of fetch
+    const token = getAuthToken();
 
     if (!token) {
       setError("You are not logged in.");
@@ -769,7 +672,6 @@ const CitizenCommunication = () => {
     }
 
     try {
-      // This now correctly calls the general '/issues' endpoint
       const res = await fetch("http://localhost:5001/issues", {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -780,13 +682,10 @@ const CitizenCommunication = () => {
 
       const data = await res.json();
 
-      // Based on your Postman response, the data is directly in `data.issues`
       if (Array.isArray(data.issues)) {
         setIssues(data.issues);
-        setError(""); // Clear any previous errors
+        setError("");
       } else {
-        // This handles cases where the API response format is unexpected
-        console.error("API response is not in the expected format:", data);
         throw new Error("Unexpected data format from the server.");
       }
     } catch (err) {
@@ -806,125 +705,159 @@ const CitizenCommunication = () => {
       ? issues
       : issues.filter((issue) => issue.status?.toLowerCase() === statusFilter);
 
+  // ✅ Loading state with PWALayout
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
+      <PWALayout title="Community" showNotifications={true}>
+        <div className="px-4 pb-6">
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <Loader2 className="w-8 h-8 text-gray-400 mx-auto mb-3 animate-spin" />
+              <div className="text-gray-500">Loading community reports...</div>
+            </div>
+          </div>
+        </div>
+      </PWALayout>
+    );
+  }
+
+  // ✅ Error state with PWALayout
+  if (error) {
+    return (
+      <PWALayout title="Community" showNotifications={true}>
+        <div className="px-4 pb-6">
+          <Card className="border-red-200 bg-red-50">
+            <CardContent className="p-6 text-center">
+              <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-3" />
+              <h3 className="text-lg font-semibold text-red-900 mb-2">Error Loading Issues</h3>
+              <p className="text-red-700 mb-4">{error}</p>
+              <Button onClick={() => window.location.reload()}>
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Try Again
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </PWALayout>
     );
   }
 
   return (
-    <div className="bg-gray-50 min-h-screen font-sans">
-      <main className="container mx-auto p-6">
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6">
-          <h2 className="text-3xl font-bold text-gray-800 mb-4 sm:mb-0">
-            Community Reports
-          </h2>
-
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => setStatusFilter("all")}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                statusFilter === "all"
-                  ? "bg-blue-600 text-white"
-                  : "bg-white text-gray-600 hover:bg-gray-100 border"
-              }`}
-            >
-              All ({issues.length})
-            </button>
-            {Object.entries(STATUS_CONFIG).map(([key, config]) => {
-              const count = issues.filter(
-                (issue) => issue.status?.toLowerCase() === key
-              ).length;
-              return (
-                <button
-                  key={key}
-                  onClick={() => setStatusFilter(key)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                    statusFilter === key
-                      ? "bg-blue-600 text-white"
-                      : `bg-white text-gray-600 hover:bg-gray-100 border`
-                  }`}
-                >
-                  {config.label} ({count})
-                </button>
-              );
-            })}
-          </div>
+    <PWALayout title="Community" showNotifications={true}>
+      <div className="px-4 pb-6">
+        {/* ✅ Header Section */}
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Community Reports</h2>
+          <p className="text-gray-600">View and engage with community-reported issues</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* ✅ Status Filter Buttons */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="text-lg">Filter by Status</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant={statusFilter === "all" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setStatusFilter("all")}
+              >
+                All ({issues.length})
+              </Button>
+              {Object.entries(STATUS_CONFIG).map(([key, config]) => {
+                const count = issues.filter(
+                  (issue) => issue.status?.toLowerCase() === key
+                ).length;
+                return (
+                  <Button
+                    key={key}
+                    variant={statusFilter === key ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setStatusFilter(key)}
+                  >
+                    {config.label} ({count})
+                  </Button>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* ✅ Issues Grid */}
+        <div className="space-y-4 mb-6">
           {filteredIssues.map((issue) => (
-            <div
+            <Card
               key={issue.issue_id}
-              className="bg-white rounded-xl shadow-md cursor-pointer hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden flex flex-col border border-gray-100"
+              className="cursor-pointer hover:shadow-lg transition-shadow"
               onClick={() => setSelectedIssue(issue)}
             >
-              {issue.image_url && (
-                <img
-                  src={issue.image_url}
-                  alt={issue.issue_title}
-                  className="w-full h-48 object-cover"
-                />
-              )}
-              <div className="p-6 flex-grow flex flex-col">
+              <CardContent className="p-4">
                 <div className="flex justify-between items-start mb-3">
-                  <h3 className="text-xl font-bold text-gray-800 line-clamp-2 flex-1">
+                  <h3 className="font-semibold text-gray-900 flex-1 pr-2">
                     {issue.issue_title}
                   </h3>
                   <StatusPill status={issue.status} />
                 </div>
 
-                <p className="text-gray-600 text-sm mb-4 line-clamp-3 flex-grow">
+                <p className="text-gray-600 text-sm mb-3 line-clamp-2">
                   {issue.issue_description}
                 </p>
 
-                <div className="space-y-2 pt-4 border-t border-gray-100">
+                {issue.image_url && (
+                  <div className="mb-3">
+                    <img
+                      src={issue.image_url}
+                      alt={issue.issue_title}
+                      className="w-full h-32 object-cover rounded-lg"
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-2">
                   {issue.address_component && (
                     <div className="flex items-center gap-2 text-sm text-gray-500">
-                      <MapPin size={14} className="flex-shrink-0" />
-                      <span className="truncate">
-                        {issue.address_component}
-                      </span>
+                      <MapPin className="w-3 h-3 flex-shrink-0" />
+                      <span className="truncate">{issue.address_component}</span>
                     </div>
                   )}
                   <div className="flex items-center justify-between text-sm text-gray-500">
                     <div className="flex items-center gap-2">
-                      <User size={14} />
+                      <User className="w-3 h-3" />
                       <span>{issue.profiles?.name || "Anonymous"}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Calendar size={14} />
-                      <span>
-                        {new Date(issue.created_at).toLocaleDateString()}
-                      </span>
+                      <Calendar className="w-3 h-3" />
+                      <span>{new Date(issue.created_at).toLocaleDateString()}</span>
                     </div>
                   </div>
                 </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           ))}
         </div>
 
+        {/* ✅ Empty State */}
         {filteredIssues.length === 0 && (
-          <div className="text-center py-12">
-            <AlertTriangle className="mx-auto mb-4 text-gray-300" size={48} />
-            <p className="text-gray-500">
-              No issues found for the selected status.
-            </p>
-          </div>
+          <Card>
+            <CardContent className="p-8 text-center">
+              <AlertTriangle className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">No Issues Found</h3>
+              <p className="text-gray-600">No issues found for the selected status.</p>
+            </CardContent>
+          </Card>
         )}
-      </main>
+      </div>
 
+      {/* ✅ Issue Modal */}
       {selectedIssue && (
         <IssueModal
           issue={selectedIssue}
           onClose={() => setSelectedIssue(null)}
         />
       )}
-    </div>
+    </PWALayout>
   );
 };
 
-export default CitizenCommunication;
+export default CommunityIssues;

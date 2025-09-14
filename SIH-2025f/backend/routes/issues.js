@@ -14,7 +14,7 @@ const {
   classifyReport,
   getDeptIssues,
   updateIssueStatus,
-
+  fetchAddress,
   createIssueWithLocation,
 } = require("../controllers/issuesController");
 
@@ -32,6 +32,7 @@ router.post(
   upload.single("photo"),
   createIssueWithLocation
 );
+router.post("/fetch-address", fetchAddress);
 // Fetch single issue by ID
 router.get("/dept/:issue_id", authMiddleware, getDeptIssues);
 

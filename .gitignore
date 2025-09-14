@@ -18,6 +18,7 @@ yarn-error.log*
 venv/
 __pycache__/
 *.pyc
+.venv
 
 # Environment variables
 .env

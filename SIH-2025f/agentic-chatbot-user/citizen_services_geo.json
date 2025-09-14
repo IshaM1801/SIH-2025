@@ -1,0 +1,126 @@
+[
+  {
+    "department": "Fire Department",
+    "location": "Bandra",
+    "address": "Bandra Fire Station, Bandra West, Mumbai",
+    "phone": "022-2642-2222"
+  },
+  {
+    "department": "Water Department",
+    "location": "Bandra",
+    "address": "Municipal Water Supply Office, Bandra East, Mumbai",
+    "phone": "022-2649-4444"
+  },
+  {
+    "department": "Roads / PWD",
+    "location": "Bandra",
+    "address": "PWD Sub-Division Office, Bandra East, Mumbai",
+    "phone": "022-2649-3333"
+  },
+  {
+    "department": "Electricity",
+    "location": "Bandra",
+    "address": "Adani Electricity Office, Bandra West, Mumbai",
+    "phone": "1800-233-5555"
+  },
+
+  {
+    "department": "Fire Department",
+    "location": "Andheri",
+    "address": "Andheri Fire Station, Andheri East, Mumbai",
+    "phone": "022-2684-3333"
+  },
+  {
+    "department": "Roads / PWD",
+    "location": "Andheri",
+    "address": "PWD Sub-Division Office, Andheri East, Mumbai",
+    "phone": "022-2685-6666"
+  },
+  {
+    "department": "Water Department",
+    "location": "Andheri",
+    "address": "Municipal Water Supply Office, Andheri West, Mumbai",
+    "phone": "022-2672-2222"
+  },
+  {
+    "department": "Electricity",
+    "location": "Andheri",
+    "address": "Adani Electricity Office, Andheri West, Mumbai",
+    "phone": "1800-233-4444"
+  },
+
+  {
+    "department": "Fire Department",
+    "location": "Dadar",
+    "address": "Dadar Fire Station, Dadar East, Mumbai",
+    "phone": "022-2421-7777"
+  },
+  {
+    "department": "Water Department",
+    "location": "Dadar",
+    "address": "Municipal Water Supply Office, Dadar West, Mumbai",
+    "phone": "022-2422-5555"
+  },
+  {
+    "department": "Roads / PWD",
+    "location": "Dadar",
+    "address": "PWD Office, Dadar East, Mumbai",
+    "phone": "022-2423-8888"
+  },
+  {
+    "department": "Electricity",
+    "location": "Dadar",
+    "address": "Adani Electricity Office, Dadar East, Mumbai",
+    "phone": "1800-233-6666"
+  },
+
+  {
+    "department": "Fire Department",
+    "location": "Borivali",
+    "address": "Borivali Fire Station, Borivali West, Mumbai",
+    "phone": "022-2893-1111"
+  },
+  {
+    "department": "Water Department",
+    "location": "Borivali",
+    "address": "Municipal Water Supply Office, Borivali East, Mumbai",
+    "phone": "022-2892-4444"
+  },
+  {
+    "department": "Roads / PWD",
+    "location": "Borivali",
+    "address": "PWD Office, Borivali East, Mumbai",
+    "phone": "022-2894-5555"
+  },
+  {
+    "department": "Electricity",
+    "location": "Borivali",
+    "address": "Adani Electricity Office, Borivali West, Mumbai",
+    "phone": "1800-233-7777"
+  },
+
+  {
+    "department": "Fire Department",
+    "location": "Chembur",
+    "address": "Chembur Fire Station, Chembur East, Mumbai",
+    "phone": "022-2521-8888"
+  },
+  {
+    "department": "Water Department",
+    "location": "Chembur",
+    "address": "Municipal Water Supply Office, Chembur West, Mumbai",
+    "phone": "022-2522-9999"
+  },
+  {
+    "department": "Roads / PWD",
+    "location": "Chembur",
+    "address": "PWD Sub-Division Office, Chembur East, Mumbai",
+    "phone": "022-2523-3333"
+  },
+  {
+    "department": "Electricity",
+    "location": "Chembur",
+    "address": "Adani Electricity Office, Chembur West, Mumbai",
+    "phone": "1800-233-8888"
+  }
+]

@@ -644,7 +644,7 @@ const PriorityIssues = ({ priorityIssues }) => {
           priorities.map((issue, index) => (
             <div
               key={index}
-              className="flex items-center justify-between p-3 border border-red-200 bg-red-50 rounded-lg"
+              className="flex items-center justify-between p-3 border border-red-200 bg-red-50 rounded-lg truncate"
             >
               <div className="flex-1">
                 <p className="text-sm font-medium text-slate-800">

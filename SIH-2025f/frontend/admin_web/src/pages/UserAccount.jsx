@@ -469,10 +469,6 @@ function UserAccount() {
                     <span className="text-gray-900">
                       {editedData.phone || "Not provided"}
                     </span>
-                    {/* ✅ Show data source indicator */}
-                    {profileData?.phone && (
-                      <Badge variant="outline" className="text-xs">From DB</Badge>
-                    )}
                   </div>
                 )}
               </div>

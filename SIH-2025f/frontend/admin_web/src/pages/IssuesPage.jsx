@@ -258,7 +258,7 @@ function IssuesPage() {
       <div className="px-4 pb-6">
         {/* Welcome Section */}
         <div className="mb-6">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2 mt-2">
             Welcome back, {getUserName()}!
           </h2>
           <p className="text-gray-600">

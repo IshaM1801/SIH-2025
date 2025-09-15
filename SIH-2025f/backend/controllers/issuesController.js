@@ -4,6 +4,32 @@ const { sendWhatsAppMessage } = require("../services/whatsappService");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
+// ✅ Create a shared reverse geocoding function
+const reverseGeocode = async (latitude, longitude) => {
+  try {
+    const openCageKey = process.env.OPENCAGE_KEY;
+    const geoCodeRes = await axios.get(
+      `https://api.opencagedata.com/geocode/v1/json?q=${latitude}+${longitude}&key=${openCageKey}&no_annotations=1`
+    );
+
+    if (geoCodeRes.data?.results?.length > 0) {
+      const c = geoCodeRes.data.results[0].components;
+      return [
+        c.suburb || c.neighbourhood || c.village,
+        c.city || c.town || c.village,
+        c.state,
+        c.country,
+      ]
+        .filter(Boolean)
+        .join(", ");
+    }
+    return "Unknown location";
+  } catch (geoErr) {
+    console.warn("⚠️ Reverse geocode failed:", geoErr.message);
+    return "Unknown location";
+  }
+};
+
 //function to convert image URL to base64 to pass gemini
 async function urlToGenerativePart(url) {
   try {
@@ -772,6 +798,30 @@ const removeIssueAssignment = async (req, res) => {
   }
 };
 
+// ✅ Enhanced fetch-address route that just calls the shared function
+const fetchAddress = async (req, res) => {
+  try {
+    const { latitude, longitude } = req.body;
+
+    if (!latitude || !longitude) {
+      return res
+        .status(400)
+        .json({ error: "Latitude and longitude are required" });
+    }
+
+    console.log("🌍 Fetching address for:", latitude, longitude);
+
+    const formattedAddress = await reverseGeocode(latitude, longitude);
+
+    console.log("✅ Address resolved:", formattedAddress);
+
+    res.json({ address: formattedAddress });
+  } catch (err) {
+    console.error("fetchAddress error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 module.exports = {
   getAllIssues,
   getUserIssues,
@@ -782,4 +832,5 @@ module.exports = {
   updateIssueStatus,
   agentUpdateIssue,
   createIssueWithLocation,
+  fetchAddress,
 };

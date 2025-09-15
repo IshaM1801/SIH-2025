@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { useTranslation } from 'react-i18next';
 import {
   Card,
   CardContent,
@@ -13,6 +14,7 @@ import { Label } from "@/components/ui/label";
 
 function Login() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [mode, setMode] = useState("user"); // "user" or "employee"
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
@@ -31,7 +33,7 @@ function Login() {
     e.preventDefault();
 
     if (!formData.email || !formData.password) {
-      setError("All fields are required");
+      setError(t('login.all_fields_required'));
       return;
     }
 
@@ -54,9 +56,9 @@ function Login() {
 
       const data = await response.json();
 
-      if (!response.ok) throw new Error(data.error || "Login failed");
+      if (!response.ok) throw new Error(data.error || t('login.failed'));
 
-      setSuccessMessage(data.message || "Login successful!");
+      setSuccessMessage(data.message || t('login.success'));
 
       // Save token & user info
       if (data.type === "employee" && mode === "employee") {
@@ -71,7 +73,7 @@ function Login() {
   
         setTimeout(() => navigate("/issues"), 1000);
       } else {
-        setError("Unknown user type from backend. Please contact support.");
+        setError(t('login.unknown_user_type'));
       }//.
     } catch (err) {
       setError(err.message);
@@ -84,13 +86,9 @@ function Login() {
     <div className="min-h-screen w-full flex justify-center items-center bg-[#FAF6F0] px-4">
       <div className="w-full max-w-6xl">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            FixMyCity Portal
-          </h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">{t('app.title')} Portal</h1>
           <p className="text-gray-600">
-            {mode === "user"
-              ? "Sign in to report and track civic issues"
-              : "Sign in to manage civic reports"}
+            {mode === "user" ? t('login.subtitle_user') : t('login.subtitle_employee')}
           </p>
         </div>
 
@@ -100,13 +98,13 @@ function Login() {
             variant={mode === "user" ? "default" : "outline"}
             onClick={() => setMode("user")}
           >
-            User
+            {t('login.user')}
           </Button>
           <Button
             variant={mode === "employee" ? "default" : "outline"}
             onClick={() => setMode("employee")}
           >
-            Employee
+            {t('login.employee')}
           </Button>
         </div>
 
@@ -123,23 +121,22 @@ function Login() {
             <div className="p-8 flex flex-col justify-center">
               <CardHeader className="space-y-1 p-0 mb-6">
                 <CardTitle className="text-2xl text-center">
-                  {mode === "user" ? "Welcome User" : "Welcome Back Employee"}
+                  {mode === "user" ? t('login.welcome_user') : t('login.welcome_employee')}
                 </CardTitle>
                 <CardDescription className="text-center">
-                  Enter your credentials to access the{" "}
-                  {mode === "user" ? "user dashboard" : "admin dashboard"}
+                  {t('login.enter_credentials')} {mode === "user" ? t('login.user_dashboard') : t('login.admin_dashboard')}
                 </CardDescription>
               </CardHeader>
 
               <CardContent className="p-0">
                 <form onSubmit={handleLogin} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
+                    <Label htmlFor="email">{t('login.email')}</Label>
                     <Input
                       id="email"
                       name="email"
                       type="email"
-                      placeholder="Enter your email"
+                      placeholder={t('login.email_placeholder')}
                       value={formData.email}
                       onChange={handleInputChange}
                       disabled={loading}
@@ -147,12 +144,12 @@ function Login() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="password">Password</Label>
+                    <Label htmlFor="password">{t('login.password')}</Label>
                     <Input
                       id="password"
                       name="password"
                       type="password"
-                      placeholder="Enter your password"
+                      placeholder={t('login.password_placeholder')}
                       value={formData.password}
                       onChange={handleInputChange}
                       disabled={loading}
@@ -174,7 +171,7 @@ function Login() {
                   )}
 
                   <Button type="submit" className="w-full" disabled={loading}>
-                    {loading ? "Signing in..." : "Sign In"}
+                    {loading ? t('login.signing_in') : t('login.sign_in')}
                   </Button>
                 </form>
 
@@ -182,12 +179,12 @@ function Login() {
                 {mode === "user" && (
                   <div className="mt-6 text-center">
                     <p className="text-sm text-gray-600 mb-3">
-                      New here?{" "}
+                      {t('login.new_here')} {" "}
                       <Button
                         variant="outline"
                         onClick={async () => {
                           if (!formData.email || !formData.password) {
-                            setError("⚠️ Please fill all required fields");
+                            setError(t('login.all_fields_required_warning'));
                             return;
                           }
                           setLoading(true);
@@ -209,7 +206,7 @@ function Login() {
                             );
                             const data = await res.json();
                             if (!res.ok)
-                              throw new Error(data.error || "Registration failed");
+                              throw new Error(data.error || t('login.registration_failed'));
                             setSuccessMessage(data.message);
                           } catch (err) {
                             setError(err.message);
@@ -219,7 +216,7 @@ function Login() {
                         }}
                         disabled={loading}
                       >
-                        Register
+                        {t('login.register')}
                       </Button>
                     </p>
                   </div>

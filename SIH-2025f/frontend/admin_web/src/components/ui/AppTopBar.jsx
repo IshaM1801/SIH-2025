@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Bell, Settings, LogOut } from "lucide-react";
+import { useTranslation } from 'react-i18next';
+import LanguageSwitcher from './LanguageSwitcher';
 
 function AppTopBar({
   title = "FixMyCity",
   showNotifications = true,
   showSettings = false,
 }) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [userData, setUserData] = useState(null);
 
@@ -71,10 +74,11 @@ function AppTopBar({
               />
             </div>
           </div>
-          <h1 className="text-xl font-bold text-gray-900">{title}</h1>
+          <h1 className="text-xl font-bold text-gray-900">{t('app.title')}</h1>
         </div>
 
         <div className="flex items-center space-x-3">
+          <LanguageSwitcher />
           {showNotifications && (
             <button className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
               <Bell className="w-5 h-5 text-gray-600" />
@@ -90,10 +94,10 @@ function AppTopBar({
           <button
             onClick={handleLogout}
             className="flex items-center space-x-2 px-3 py-2 text-sm text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-            title="Logout"
+            title={t('common.logout')}
           >
             <LogOut className="w-4 h-4" />
-            <span className="hidden sm:inline">Logout</span>
+            <span className="hidden sm:inline">{t('common.logout')}</span>
           </button>
 
           <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">

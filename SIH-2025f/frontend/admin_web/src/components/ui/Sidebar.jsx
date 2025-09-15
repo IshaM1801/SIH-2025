@@ -1,5 +1,6 @@
 import React from "react"; // No longer needs useState
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useTranslation } from 'react-i18next';
 import {
   Users,
   FileText,
@@ -18,6 +19,7 @@ import {
 
 // 1. Component now accepts isOpen and setIsOpen as props from the Layout
 const Sidebar = ({ adminData, isOpen, setIsOpen }) => {
+  const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -53,51 +55,51 @@ const Sidebar = ({ adminData, isOpen, setIsOpen }) => {
 
   const groupedSidebarItems = [
     {
-      title: "Workspace",
+      title: t('nav.workspace'),
       items: [
-        { icon: FileText, label: "Report Management", path: "/reports" },
-        { icon: MapIcon, label: "Map", path: "/map" },
-        { icon: BarChart3, label: "Analytics", path: "/dashboard" },
+        { icon: FileText, label: t('nav.report_management'), path: "/reports" },
+        { icon: MapIcon, label: t('nav.map'), path: "/map" },
+        { icon: BarChart3, label: t('nav.analytics'), path: "/dashboard" },
       ],
     },
     {
-      title: "Automation",
+      title: t('nav.automation'),
       items: [
         {
           icon: ArrowRightLeft,
-          label: "Task Routing Module",
+          label: t('nav.task_routing'),
           path: "/task-routing",
         },
         {
           icon: ShieldAlert,
-          label: "Escalation Management",
+          label: t('nav.escalations'),
           path: "/escalations",
         },
         {
           icon: GitBranch,
-          label: "AI Efficiency Calculator",
+          label: t('nav.ai_efficiency'),
           path: "/ai-efficiency",
         },
       ],
     },
     {
-      title: "Configuration",
+      title: t('nav.configuration'),
       items: [
-        { icon: Users, label: "Citizen & Department", path: "/citizens" },
-        { icon: Sliders, label: "Issue Categories Setup", path: "/categories" },
+        { icon: Users, label: t('nav.citizens'), path: "/citizens" },
+        { icon: Sliders, label: t('nav.categories'), path: "/categories" },
         {
           icon: MessageSquare,
-          label: "Citizen Communication",
+          label: t('nav.communication'),
           path: "/communication",
         },
       ],
     },
     {
-      title: "Monitoring",
+      title: t('nav.monitoring'),
       items: [
         {
           icon: LineChart,
-          label: "Performance Monitoring",
+          label: t('nav.performance'),
           path: "/performance",
         },
       ],
@@ -122,10 +124,10 @@ const Sidebar = ({ adminData, isOpen, setIsOpen }) => {
               />
               <div className="flex flex-col">
                 <h1 className="text-xl font-bold text-gray-800 tracking-tight">
-                  Government Of
+                  {t('common.government_of')}
                 </h1>
                 <h1 className="text-xl pl-5 font-bold text-gray-800 tracking-tight">
-                  Jharkhand
+                  {t('common.jharkhand')}
                 </h1>
               </div>
             </div>

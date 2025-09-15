@@ -5,8 +5,10 @@
     "@radix-ui/react-select": "^2.2.6",
     "canvas": "^3.2.0",
     "dotenv": "^17.2.2",
+    "i18next": "^25.5.2",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.2",
+    "react-i18next": "^15.7.3",
     "twilio": "^5.9.0",
     "wkx": "^0.5.0",
     "ws": "^8.18.3"

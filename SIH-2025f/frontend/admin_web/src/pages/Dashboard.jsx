@@ -8,9 +8,11 @@ import {
   MapPin, Settings, MessageSquare, BookOpen, Award, Eye, LogOut
 } from 'lucide-react';
 import DepartmentIssuesComponent from '@/components/ui/DepartmentIssues';
+import { useTranslation } from 'react-i18next';
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   
   // Add state for admin data
   const [adminData, setAdminData] = useState(null);
@@ -36,7 +38,7 @@ const Dashboard = () => {
     if (adminData?.employee?.name) {
       return adminData.employee.name;
     }
-    return "Admin User"; // fallback
+    return t('dashboard.admin_user'); // fallback
   };
 
   // Get admin initials
@@ -57,7 +59,7 @@ const Dashboard = () => {
     if (adminData?.employee?.dept_name) {
       return adminData.employee.dept_name;
     }
-    return "Administration"; // fallback
+    return t('dashboard.administration'); // fallback
   };
 
   // Add logout function
@@ -129,7 +131,7 @@ const Dashboard = () => {
               <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
                 <div className="w-6 h-6 bg-blue-600 rounded"></div>
               </div>
-              <h1 className="text-xl font-semibold text-gray-900 truncate">Dashboard</h1>
+              <h1 className="text-xl font-semibold text-gray-900 truncate">{t('dashboard.title')}</h1>
             </div>
             
             {/* Admin Info Card */}
@@ -168,7 +170,7 @@ const Dashboard = () => {
           {/* Top Navbar - Updated with logout button */}
           <div className="bg-white border-b border-gray-200 flex flex-col xl:flex-row xl:items-center xl:justify-between px-4 xl:px-8 py-4 xl:py-6 shadow-sm">
             <h2 className="text-xl xl:text-2xl font-bold text-gray-900 mb-4 xl:mb-0 truncate min-w-0">
-              Civic Issue Management Dashboard
+              {t('dashboard.header')}
             </h2>
             
             <div className="flex flex-col xl:flex-row xl:items-center space-y-4 xl:space-y-0 xl:space-x-6 min-w-0">
@@ -183,7 +185,7 @@ const Dashboard = () => {
                   title="Logout"
                 >
                   <LogOut className="w-4 h-4" />
-                  <span className="hidden sm:inline">Logout</span>
+                  <span className="hidden sm:inline">{t('common.logout')}</span>
                 </button>
                 
                 <div className="flex items-center space-x-3">
@@ -209,7 +211,7 @@ const Dashboard = () => {
                     <Users className="w-6 xl:w-8 h-6 xl:h-8 text-blue-500 flex-shrink-0" />
                   </div>
                   <div className="text-xl xl:text-2xl font-bold text-gray-900 mb-1 truncate">2.8K</div>
-                  <div className="text-xs xl:text-sm text-gray-500 mb-2 truncate">Active Citizens</div>
+                  <div className="text-xs xl:text-sm text-gray-500 mb-2 truncate">{t('dashboard.active_citizens')}</div>
                   <div className="text-xs text-green-500 truncate">+12.3% Since last month</div>
                 </div>
               </div>
@@ -220,7 +222,7 @@ const Dashboard = () => {
                     <MapPin className="w-6 xl:w-8 h-6 xl:h-8 text-green-500 flex-shrink-0" />
                   </div>
                   <div className="text-xl xl:text-2xl font-bold text-gray-900 mb-1 truncate">145</div>
-                  <div className="text-xs xl:text-sm text-gray-500 mb-2 truncate">Active Hotspots</div>
+                  <div className="text-xs xl:text-sm text-gray-500 mb-2 truncate">{t('dashboard.active_hotspots')}</div>
                   <div className="text-xs text-green-500 truncate">+8.7% Since last month</div>
                 </div>
               </div>
@@ -231,7 +233,7 @@ const Dashboard = () => {
                     <DollarSign className="w-6 xl:w-8 h-6 xl:h-8 text-purple-500 flex-shrink-0" />
                   </div>
                   <div className="text-xl xl:text-2xl font-bold text-gray-900 mb-1 truncate">24.2H</div>
-                  <div className="text-xs xl:text-sm text-gray-500 mb-2 truncate">Avg Response Time</div>
+                  <div className="text-xs xl:text-sm text-gray-500 mb-2 truncate">{t('dashboard.avg_response_time')}</div>
                   <div className="text-xs text-red-500 truncate">-15.2% Since last month</div>
                 </div>
               </div>
@@ -242,7 +244,7 @@ const Dashboard = () => {
                     <FileText className="w-6 xl:w-8 h-6 xl:h-8 text-blue-500 flex-shrink-0" />
                   </div>
                   <div className="text-xl xl:text-2xl font-bold text-gray-900 mb-1 truncate">5.9K</div>
-                  <div className="text-xs xl:text-sm text-gray-500 mb-2 truncate">Total Reports</div>
+                  <div className="text-xs xl:text-sm text-gray-500 mb-2 truncate">{t('dashboard.total_reports')}</div>
                   <div className="text-xs text-green-500 truncate">+18.2% Since last month</div>
                 </div>
               </div>
@@ -253,7 +255,7 @@ const Dashboard = () => {
                     <HelpCircle className="w-6 xl:w-8 h-6 xl:h-8 text-orange-500 flex-shrink-0" />
                   </div>
                   <div className="text-xl xl:text-2xl font-bold text-gray-900 mb-1 truncate">3.2K</div>
-                  <div className="text-xs xl:text-sm text-gray-500 mb-2 truncate">Reports Resolved</div>
+                  <div className="text-xs xl:text-sm text-gray-500 mb-2 truncate">{t('dashboard.reports_resolved')}</div>
                   <div className="text-xs text-orange-500 truncate">Downtown Area</div>
                 </div>
               </div>
@@ -264,7 +266,7 @@ const Dashboard = () => {
                     <Award className="w-6 xl:w-8 h-6 xl:h-8 text-gray-500 flex-shrink-0" />
                   </div>
                   <div className="text-xl xl:text-2xl font-bold text-gray-900 mb-1 truncate">87%</div>
-                  <div className="text-xs xl:text-sm text-gray-500 mb-2 truncate">Resolution Rate</div>
+                  <div className="text-xs xl:text-sm text-gray-500 mb-2 truncate">{t('dashboard.resolution_rate')}</div>
                   <div className="text-xs text-green-500 truncate">+5.1% Since last month</div>
                 </div>
               </div>
@@ -280,7 +282,7 @@ const Dashboard = () => {
               {/* Map Section */}
               <div className="col-span-1">
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 h-[400px] xl:h-[450px] hover:shadow-md transition-shadow overflow-hidden">
-                  <h3 className="text-lg xl:text-xl font-semibold text-gray-900 mb-4 truncate">Issue Distribution Map</h3>
+                  <h3 className="text-lg xl:text-xl font-semibold text-gray-900 mb-4 truncate">{t('dashboard.issue_distribution_map')}</h3>
                   <div className="relative h-[320px] xl:h-[360px] bg-gradient-to-br from-blue-100 to-indigo-200 rounded-xl overflow-hidden">
                     {/* City Map with Issue Markers */}
                     <svg viewBox="0 0 400 300" className="w-full h-full">
@@ -310,15 +312,15 @@ const Dashboard = () => {
                       <div className="flex flex-wrap items-center gap-2 text-xs">
                         <div className="flex items-center space-x-1 whitespace-nowrap">
                           <div className="w-3 h-3 bg-red-500 rounded-full flex-shrink-0"></div>
-                          <span>High</span>
+                          <span>{t('dashboard.legend.high')}</span>
                         </div>
                         <div className="flex items-center space-x-1 whitespace-nowrap">
                           <div className="w-3 h-3 bg-yellow-500 rounded-full flex-shrink-0"></div>
-                          <span>Medium</span>
+                          <span>{t('dashboard.legend.medium')}</span>
                         </div>
                         <div className="flex items-center space-x-1 whitespace-nowrap">
                           <div className="w-3 h-3 bg-green-500 rounded-full flex-shrink-0"></div>
-                          <span>Low</span>
+                          <span>{t('dashboard.legend.low')}</span>
                         </div>
                       </div>
                     </div>
@@ -329,7 +331,7 @@ const Dashboard = () => {
               {/* Issue Status Breakdown Donut Chart */}
               <div className="col-span-1">
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 h-[400px] xl:h-[450px] hover:shadow-md transition-shadow">
-                  <h3 className="text-lg xl:text-xl font-semibold text-gray-900 mb-4 truncate">Issue Status Breakdown</h3>
+                  <h3 className="text-lg xl:text-xl font-semibold text-gray-900 mb-4 truncate">{t('dashboard.issue_status_breakdown')}</h3>
                   <div className="flex flex-row items-center justify-center h-[300px] xl:h-[350px] overflow-hidden">
                     <div className="relative mb-4 xl:mb-0 flex-shrink-0">
                       <PieChart width={200} height={200}>
@@ -358,21 +360,21 @@ const Dashboard = () => {
                         <div className="w-3 h-3 bg-green-500 rounded-full flex-shrink-0"></div>
                         <div className="min-w-0 flex-1">
                           <div className="text-xl font-semibold text-gray-900 truncate">3.2K</div>
-                          <div className="text-lg text-gray-500 truncate">Resolved Issues</div>
+                          <div className="text-lg text-gray-500 truncate">{t('dashboard.resolved_issues')}</div>
                         </div>
                       </div>
                       <div className="flex items-center space-x-3 overflow-hidden">
                         <div className="w-3 h-3 bg-blue-500 rounded-full flex-shrink-0"></div>
                         <div className="min-w-0 flex-1">
                           <div className="text-xl font-semibold text-gray-900 truncate">1.9K</div>
-                          <div className="text-lg text-gray-500 truncate">In Progress</div>
+                          <div className="text-lg text-gray-500 truncate">{t('dashboard.in_progress')}</div>
                         </div>
                       </div>
                       <div className="flex items-center space-x-3 overflow-hidden">
                         <div className="w-3 h-3 bg-yellow-500 rounded-full flex-shrink-0"></div>
                         <div className="min-w-0 flex-1">
                           <div className="text-xl font-semibold text-gray-900 truncate">0.8K</div>
-                          <div className="text-lg text-gray-500 truncate">Pending</div>
+                          <div className="text-lg text-gray-500 truncate">{t('dashboard.pending')}</div>
                         </div>
                       </div>
                     </div>
@@ -383,7 +385,7 @@ const Dashboard = () => {
               {/* Reports by District Chart */}
               <div className="col-span-1">
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 h-[400px] xl:h-[450px] hover:shadow-md transition-shadow overflow-hidden">
-                  <h3 className="text-lg xl:text-xl font-semibold text-gray-900 mb-4 truncate">Monthly Reports by District</h3>
+                  <h3 className="text-lg xl:text-xl font-semibold text-gray-900 mb-4 truncate">{t('dashboard.monthly_reports_by_district')}</h3>
                   <div className="h-[320px] xl:h-[360px] overflow-hidden">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={reportsByDistrictData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
@@ -412,8 +414,8 @@ const Dashboard = () => {
               <div className="col-span-1">
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 h-[425px] xl:h-[450px] hover:shadow-md transition-shadow">
                   <div className="mb-4">
-                    <h3 className="text-lg xl:text-xl font-semibold text-gray-900 truncate">Department Response Time</h3>
-                    <p className="text-sm text-gray-500 truncate">Average time from report submission to first department response</p>
+                    <h3 className="text-lg xl:text-xl font-semibold text-gray-900 truncate">{t('dashboard.department_response_time')}</h3>
+                    <p className="text-sm text-gray-500 truncate">{t('dashboard.department_response_time_desc')}</p>
                   </div>
                   <div className="h-[280px] xl:h-[320px] overflow-hidden">
                     <ResponsiveContainer width="100%" height="100%">
@@ -442,7 +444,7 @@ const Dashboard = () => {
                     </ResponsiveContainer>
                   </div>
                   <div className="mt-4 flex justify-center">
-                    <div className="bg-gray-900 text-white px-3 py-1 rounded-lg text-sm">24H Avg</div>
+                    <div className="bg-gray-900 text-white px-3 py-1 rounded-lg text-sm">{t('dashboard.avg_24h')}</div>
                   </div>
                 </div>
               </div>

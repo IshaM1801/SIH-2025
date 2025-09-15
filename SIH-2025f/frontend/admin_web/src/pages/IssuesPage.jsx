@@ -1,24 +1,32 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import PWALayout from "@/components/ui/PWALayout";
-import { 
-  FileText, 
-  PlusCircle, 
-  MapPin, 
-  Clock, 
+import {
+  FileText,
+  PlusCircle,
+  MapPin,
+  Clock,
   CheckCircle,
   AlertCircle,
   TrendingUp,
   Award,
-  RefreshCw
+  RefreshCw,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 function IssuesPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { t } = useTranslation();
   const [userData, setUserData] = useState(null);
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -43,7 +51,7 @@ function IssuesPage() {
       try {
         const token = localStorage.getItem("token");
         if (!token) {
-          setError("Authentication required. Please login again.");
+          setError(t("user.auth_required"));
           return;
         }
 
@@ -53,7 +61,7 @@ function IssuesPage() {
 
         if (!res.ok) {
           if (res.status === 401) {
-            setError("Session expired. Please login again.");
+            setError(t("user.session_expired"));
             setTimeout(() => navigate("/login"), 2000);
             return;
           }
@@ -64,11 +72,13 @@ function IssuesPage() {
         console.log("Fetched dashboard data:", data);
 
         // Handle both formats: array directly or { reports: [...] }
-        const processed = (Array.isArray(data) ? data : data.reports || []).map((report) => ({
-          ...report,
-          lat: report.latitude || report.lat || "N/A",
-          lng: report.longitude || report.lng || "N/A",
-        }));
+        const processed = (Array.isArray(data) ? data : data.reports || []).map(
+          (report) => ({
+            ...report,
+            lat: report.latitude || report.lat || "N/A",
+            lng: report.longitude || report.lng || "N/A",
+          })
+        );
 
         setReports(processed);
         setError(null);
@@ -86,17 +96,19 @@ function IssuesPage() {
   const getUserName = () => {
     if (userData?.user_metadata?.email) {
       const email = userData.user_metadata.email;
-      const nameFromEmail = email.split('@')[0];
+      const nameFromEmail = email.split("@")[0];
       return nameFromEmail
-        .replace(/[._-]/g, ' ')
-        .split(' ')
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-        .join(' ');
+        .replace(/[._-]/g, " ")
+        .split(" ")
+        .map(
+          (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+        )
+        .join(" ");
     }
     if (userData?.profile?.name) {
       return userData.profile.name;
     }
-    return "User";
+    return t("user.user");
   };
 
   // ✅ Calculate real dashboard stats from fetched reports
@@ -106,30 +118,33 @@ function IssuesPage() {
         totalReports: 0,
         pendingReports: 0,
         resolvedReports: 0,
-        inProgressReports: 0
+        inProgressReports: 0,
       };
     }
 
     const total = reports.length;
-    const resolved = reports.filter(r => 
-      r.status?.toLowerCase() === 'resolved' || 
-      r.status?.toLowerCase() === 'completed'
+    const resolved = reports.filter(
+      (r) =>
+        r.status?.toLowerCase() === "resolved" ||
+        r.status?.toLowerCase() === "completed"
     ).length;
-    const pending = reports.filter(r => 
-      r.status?.toLowerCase() === 'pending' || 
-      r.status?.toLowerCase() === 'submitted'
+    const pending = reports.filter(
+      (r) =>
+        r.status?.toLowerCase() === "pending" ||
+        r.status?.toLowerCase() === "submitted"
     ).length;
-    const inProgress = reports.filter(r => 
-      r.status?.toLowerCase() === 'in_progress' || 
-      r.status?.toLowerCase() === 'in progress' ||
-      r.status?.toLowerCase() === 'assigned'
+    const inProgress = reports.filter(
+      (r) =>
+        r.status?.toLowerCase() === "in_progress" ||
+        r.status?.toLowerCase() === "in progress" ||
+        r.status?.toLowerCase() === "assigned"
     ).length;
 
     return {
       totalReports: total,
       pendingReports: pending,
       resolvedReports: resolved,
-      inProgressReports: inProgress
+      inProgressReports: inProgress,
     };
   };
 
@@ -138,50 +153,59 @@ function IssuesPage() {
   // ✅ Get recent issues from real data (last 3 reports)
   const getRecentIssues = () => {
     if (!reports.length) return [];
-    
+
     return reports
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
       .slice(0, 3)
-      .map(report => ({
+      .map((report) => ({
         id: report.issue_id,
         title: report.issue_title || "General Issue",
         status: report.status || "Submitted",
         location: getLocationString(report),
         date: formatRelativeDate(report.created_at),
-        priority: getPriorityFromDepartment(report.department)
+        priority: getPriorityFromDepartment(report.department),
       }));
   };
 
   const getLocationString = (report) => {
     if (report.lat !== "N/A" && report.lng !== "N/A") {
-      return `${parseFloat(report.lat).toFixed(4)}, ${parseFloat(report.lng).toFixed(4)}`;
+      return `${parseFloat(report.lat).toFixed(4)}, ${parseFloat(
+        report.lng
+      ).toFixed(4)}`;
     }
     return "Location not available";
   };
 
   const formatRelativeDate = (dateString) => {
-    if (!dateString) return "Recently";
-    
+    if (!dateString) return t("user.recently");
+
     const date = new Date(dateString);
     const now = new Date();
     const diffTime = Math.abs(now - date);
     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-    
-    if (diffDays === 0) return "Today";
-    if (diffDays === 1) return "Yesterday";
-    if (diffDays < 7) return `${diffDays} days ago`;
-    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
-    return `${Math.floor(diffDays / 30)} months ago`;
+
+    if (diffDays === 0) return t("user.today");
+    if (diffDays === 1) return t("user.yesterday");
+    if (diffDays < 7) return t("user.days_ago", { count: diffDays });
+    if (diffDays < 30)
+      return t("user.weeks_ago", { count: Math.floor(diffDays / 7) });
+    return t("user.months_ago", { count: Math.floor(diffDays / 30) });
   };
 
   const getPriorityFromDepartment = (department) => {
     // Simple logic to assign priority based on department
     const highPriorityDepts = ["Emergency", "Fire", "Police", "Medical"];
-    const mediumPriorityDepts = ["Public Works", "Transportation", "Infrastructure"];
-    
-    if (highPriorityDepts.some(dept => department?.includes(dept))) return "High";
-    if (mediumPriorityDepts.some(dept => department?.includes(dept))) return "Medium";
-    return "Low";
+    const mediumPriorityDepts = [
+      "Public Works",
+      "Transportation",
+      "Infrastructure",
+    ];
+
+    if (highPriorityDepts.some((dept) => department?.includes(dept)))
+      return t("user.high");
+    if (mediumPriorityDepts.some((dept) => department?.includes(dept)))
+      return t("user.medium");
+    return t("user.low");
   };
 
   const recentIssues = getRecentIssues();
@@ -219,12 +243,12 @@ function IssuesPage() {
   // Show loading state
   if (loading) {
     return (
-      <PWALayout title="FixMyCity" showNotifications={true}>
+      <PWALayout title={t("app.title")} showNotifications={true}>
         <div className="px-4 pb-6">
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
               <RefreshCw className="w-8 h-8 text-gray-400 mx-auto mb-3 animate-spin" />
-              <div className="text-gray-500">Loading dashboard...</div>
+              <div className="text-gray-500">{t("user.loading_dashboard")}</div>
             </div>
           </div>
         </div>
@@ -235,16 +259,18 @@ function IssuesPage() {
   // Show error state
   if (error) {
     return (
-      <PWALayout title="FixMyCity" showNotifications={true}>
+      <PWALayout title={t("app.title")} showNotifications={true}>
         <div className="px-4 pb-6">
           <Card className="border-red-200 bg-red-50">
             <CardContent className="p-6 text-center">
               <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
-              <h3 className="text-lg font-semibold text-red-900 mb-2">Error Loading Dashboard</h3>
+              <h3 className="text-lg font-semibold text-red-900 mb-2">
+                {t("user.error_loading_dashboard")}
+              </h3>
               <p className="text-red-700 mb-4">{error}</p>
               <Button onClick={() => window.location.reload()}>
                 <RefreshCw className="w-4 h-4 mr-2" />
-                Try Again
+                {t("user.try_again")}
               </Button>
             </CardContent>
           </Card>
@@ -254,16 +280,14 @@ function IssuesPage() {
   }
 
   return (
-    <PWALayout title="FixMyCity" showNotifications={true}>
+    <PWALayout title={t("app.title")} showNotifications={true}>
       <div className="px-4 pb-6">
         {/* Welcome Section */}
         <div className="mb-6">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2 mt-2">
-            Welcome back, {getUserName()}!
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            {t("user.welcome_back", { name: getUserName() })}
           </h2>
-          <p className="text-gray-600">
-            Track your civic reports and make your city better
-          </p>
+          <p className="text-gray-600">{t("user.track_reports")}</p>
         </div>
 
         {/* ✅ Real Stats Cards */}
@@ -275,8 +299,12 @@ function IssuesPage() {
                   <FileText className="w-5 h-5 text-blue-600" />
                 </div>
                 <div>
-                  <p className="text-2xl text-center font-bold text-gray-900">{dashboardStats.totalReports}</p>
-                  <p className="text-xs text-gray-600">Total Reports</p>
+                  <p className="text-2xl text-center font-bold text-gray-900">
+                    {dashboardStats.totalReports}
+                  </p>
+                  <p className="text-xs text-gray-600">
+                    {t("user.total_reports")}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -289,8 +317,12 @@ function IssuesPage() {
                   <CheckCircle className="w-5 h-5 text-green-600" />
                 </div>
                 <div>
-                  <p className="text-2xl text-center font-bold text-gray-900">{dashboardStats.resolvedReports}</p>
-                  <p className="text-sm text-gray-600">Resolved</p>
+                  <p className="text-2xl text-center font-bold text-gray-900">
+                    {dashboardStats.resolvedReports}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    {t("dashboard.resolved")}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -303,8 +335,12 @@ function IssuesPage() {
                   <Clock className="w-5 h-5 text-yellow-600" />
                 </div>
                 <div>
-                  <p className="text-2xl text-center font-bold text-gray-900">{dashboardStats.pendingReports}</p>
-                  <p className="text-sm text-gray-600">Pending</p>
+                  <p className="text-2xl text-center font-bold text-gray-900">
+                    {dashboardStats.pendingReports}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    {t("dashboard.pending")}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -317,8 +353,12 @@ function IssuesPage() {
                   <TrendingUp className="w-5 h-5 text-blue-600" />
                 </div>
                 <div>
-                  <p className="text-2xl text-center font-bold text-gray-900">{dashboardStats.inProgressReports}</p>
-                  <p className="text-sm text-gray-600">In Progress</p>
+                  <p className="text-2xl text-center font-bold text-gray-900">
+                    {dashboardStats.inProgressReports}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    {t("dashboard.in_progress")}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -335,8 +375,12 @@ function IssuesPage() {
                     <Award className="w-6 h-6 text-yellow-600" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900">My Certificates</h3>
-                    <p className="text-sm text-gray-600">Download certificates for resolved issues</p>
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      {t("user.my_certificates")}
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                      {t("user.download_certificates")}
+                    </p>
                   </div>
                 </div>
                 <Button
@@ -345,14 +389,18 @@ function IssuesPage() {
                   className="flex items-center space-x-2 h-10"
                 >
                   <Award className="w-4 h-4" />
-                  <span>View</span>
+                  <span>{t("common.view")}</span>
                 </Button>
               </div>
-              
+
               <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
                 <p className="text-sm text-green-700 flex items-center">
                   <CheckCircle className="w-4 h-4 mr-2" />
-                  <span className="font-medium">{dashboardStats.resolvedReports} certificate/s</span>
+                  <span className="font-medium">
+                    {t("user.certificates_count", {
+                      count: dashboardStats.resolvedReports,
+                    })}
+                  </span>
                 </p>
               </div>
             </CardContent>
@@ -362,26 +410,26 @@ function IssuesPage() {
         {/* Quick Actions */}
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle className="text-lg">Quick Actions</CardTitle>
-            <CardDescription>Report new issues or check existing ones</CardDescription>
+            <CardTitle className="text-lg">{t("user.quick_actions")}</CardTitle>
+            <CardDescription>{t("user.quick_actions_desc")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Button 
-              onClick={() => navigate("/report-issue")} 
+            <Button
+              onClick={() => navigate("/report-issue")}
               className="w-full justify-start h-12"
               variant="outline"
             >
               <PlusCircle className="w-5 h-5 mr-3" />
-              Report New Issue
+              {t("user.report_new_issue")}
             </Button>
-            
-            <Button 
-              onClick={() => navigate("/my-reports")} 
+
+            <Button
+              onClick={() => navigate("/my-reports")}
               className="w-full justify-start h-12"
               variant="outline"
             >
               <FileText className="w-5 h-5 mr-3" />
-              View My Reports
+              {t("user.view_my_reports")}
             </Button>
           </CardContent>
         </Card>
@@ -389,33 +437,48 @@ function IssuesPage() {
         {/* ✅ Real Recent Issues */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Recent Issues</CardTitle>
-            <CardDescription>Your latest civic reports</CardDescription>
+            <CardTitle className="text-lg">{t("user.recent_issues")}</CardTitle>
+            <CardDescription>{t("user.latest_reports")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {recentIssues.length > 0 ? (
               recentIssues.map((issue) => (
-                <div key={issue.id} className="flex items-start space-x-3 p-3 border border-gray-200 rounded-lg">
+                <div
+                  key={issue.id}
+                  className="flex items-start space-x-3 p-3 border border-gray-200 rounded-lg"
+                >
                   <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
                     <AlertCircle className="w-5 h-5 text-gray-600" />
                   </div>
-                  
+
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-medium text-gray-900 truncate">{issue.title}</h3>
+                    <h3 className="font-medium text-gray-900 truncate">
+                      {issue.title}
+                    </h3>
                     <div className="flex items-center space-x-2 mt-1">
                       <MapPin className="w-3 h-3 text-gray-400" />
-                      <span className="text-sm text-gray-600 truncate">{issue.location}</span>
+                      <span className="text-sm text-gray-600 truncate">
+                        {issue.location}
+                      </span>
                     </div>
                     <div className="flex items-center space-x-2 mt-2">
-                      <Badge variant="secondary" className={`text-xs ${getStatusColor(issue.status)}`}>
+                      <Badge
+                        variant="secondary"
+                        className={`text-xs ${getStatusColor(issue.status)}`}
+                      >
                         {issue.status}
                       </Badge>
-                      <Badge variant="outline" className={`text-xs ${getPriorityColor(issue.priority)}`}>
+                      <Badge
+                        variant="outline"
+                        className={`text-xs ${getPriorityColor(
+                          issue.priority
+                        )}`}
+                      >
                         {issue.priority}
                       </Badge>
                     </div>
                   </div>
-                  
+
                   <div className="text-xs text-gray-500 flex-shrink-0">
                     {issue.date}
                   </div>
@@ -424,13 +487,13 @@ function IssuesPage() {
             ) : (
               <div className="text-center py-8">
                 <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                <p className="text-gray-600">No issues reported yet</p>
-                <Button 
-                  onClick={() => navigate("/report-issue")} 
+                <p className="text-gray-600">{t("user.no_issues_yet")}</p>
+                <Button
+                  onClick={() => navigate("/report-issue")}
                   className="mt-3"
                   size="sm"
                 >
-                  Report Your First Issue
+                  {t("user.report_first_issue")}
                 </Button>
               </div>
             )}

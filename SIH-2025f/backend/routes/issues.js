@@ -16,6 +16,7 @@ const {
   updateIssueStatus,
   agentUpdateIssue,
   createIssueWithLocation,
+  fetchAddress,
 } = require("../controllers/issuesController");
 
 const {
@@ -45,6 +46,8 @@ router.post(
   upload.single("fixedImageFile"),
   agentUpdateIssue
 );
+//fetch address for frontend
+router.post("/fetch-address", fetchAddress);
 
 router.post("/assign-issue", authMiddleware, assignIssueToEmployee);
 router.post("/deassign", authMiddleware, removeIssueAssignment);

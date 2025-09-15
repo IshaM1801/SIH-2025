@@ -35,7 +35,7 @@ const TaskRouting = () => {
       const employee = dataMe.employee;
       if (!employee || employee.position !== 0) {
         setTasks([]);
-        setError("You are not authorized to view tasks.");
+        setError("No Tasks Assigned");
         setLoading(false);
         return;
       }

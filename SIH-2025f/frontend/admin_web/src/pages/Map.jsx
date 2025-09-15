@@ -6,6 +6,7 @@ import {
   ZoomOut,
   RefreshCw,
 } from "lucide-react";
+import { useTranslation } from 'react-i18next';
 
 // --- CUSTOM MARKER ICONS LOGIC ---
 // NOTE: Make sure you have the marker SVG files in your `public/icons/` directory.
@@ -116,6 +117,7 @@ const styledMapStyles = [
 ];
 
 export default function CivicIssueMap() {
+  const { t } = useTranslation();
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersRef = useRef([]);
@@ -298,7 +300,7 @@ export default function CivicIssueMap() {
     return (
       <div className="flex flex-col items-center justify-center h-full text-red-600 bg-red-50 p-4 rounded-xl">
         <AlertTriangle className="h-10 w-10 mb-3" />
-        <p className="text-lg font-semibold">Map Error</p>
+        <p className="text-lg font-semibold">{t('map.error')}</p>
         <p className="text-center text-sm">{errorMap}</p>
       </div>
     );
@@ -310,7 +312,7 @@ export default function CivicIssueMap() {
         {isLoadingMap && (
           <div className="absolute inset-0 bg-white/80 flex flex-col items-center justify-center z-20 backdrop-blur-sm">
             <Loader2 className="animate-spin h-10 w-10 text-indigo-600 mb-3" />
-            <p className="text-gray-700 font-medium">Loading Map...</p>
+            <p className="text-gray-700 font-medium">{t('map.loading')}</p>
           </div>
         )}
         <div ref={mapRef} className="w-full h-full" />

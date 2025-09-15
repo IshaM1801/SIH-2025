@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Bell, Search, Plus, Settings, User, LogOut } from "lucide-react";
+import { useTranslation } from 'react-i18next';
+import LanguageSwitcher from './LanguageSwitcher';
 
 // --- Data Processing Function (now inside the same file) ---
 const calculateIssueKpis = (apiData) => {
@@ -30,6 +32,7 @@ const calculateIssueKpis = (apiData) => {
 
 // --- Navbar Component ---
 const Navbar = ({ adminData }) => {
+  const { t, i18n } = useTranslation();
   // Note: `kpiData` is no longer a prop
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
@@ -92,9 +95,9 @@ const Navbar = ({ adminData }) => {
 
   const getGreeting = () => {
     const hours = new Date().getHours();
-    if (hours < 12) return "Good Morning!";
-    if (hours < 17) return "Good Afternoon!";
-    return "Good Evening!";
+    if (hours < 12) return t('app.greeting_morning');
+    if (hours < 17) return t('app.greeting_afternoon');
+    return t('app.greeting_evening');
   };
 
   // ... (getAdminName, getAdminInitials, handleLogout, and the other useEffect for the dropdown remain exactly the same) ...
@@ -139,7 +142,7 @@ const Navbar = ({ adminData }) => {
         <div className="flex-shrink-0">
           <h1 className="text-xl font-bold text-gray-800">{getGreeting()}</h1>
           <p className="text-sm text-gray-500">
-            Civic Issue Management Control Center
+            {t('app.title')}
           </p>
         </div>
 
@@ -152,7 +155,7 @@ const Navbar = ({ adminData }) => {
                 {kpiData ? kpiData.open : "..."}
               </p>
               <p className="text-xs text-gray-500 uppercase tracking-wider">
-                Open Issues
+                {t('common.open_issues')}
               </p>
             </div>
             <div className="h-10 border-l border-gray-200"></div>
@@ -161,8 +164,7 @@ const Navbar = ({ adminData }) => {
                 {kpiData ? kpiData.resolved : "..."}
               </p>
               <p className="text-xs text-gray-500 uppercase tracking-wider">
-                {/* IMPORTANT: As noted before, this is Total Resolved, not "Today" */}
-                Total Resolved
+                {t('common.total_resolved')}
               </p>
             </div>
           </div>
@@ -172,7 +174,7 @@ const Navbar = ({ adminData }) => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               type="text"
-              placeholder="Search by ID, location, citizen..."
+              placeholder={t('common.search_placeholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
@@ -183,6 +185,7 @@ const Navbar = ({ adminData }) => {
         {/* Right Side (User Profile, etc) */}
         {/* ... This part of your JSX remains exactly the same ... */}
         <div className="flex items-center gap-4 flex-shrink-0">
+          <LanguageSwitcher />
           <button className="p-2.5 rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors">
             <Bell className="w-6 h-6" />
           </button>
@@ -215,14 +218,14 @@ const Navbar = ({ adminData }) => {
                   href="/settings"
                   className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                 >
-                  <Settings className="w-4 h-4" /> Settings
+                  <Settings className="w-4 h-4" /> {t('common.settings')}
                 </a>
                 <div className="my-1 border-t border-gray-100"></div>
                 <button
                   onClick={handleLogout}
                   className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
                 >
-                  <LogOut className="w-4 h-4" /> Logout
+                  <LogOut className="w-4 h-4" /> {t('common.logout')}
                 </button>
               </div>
             )}

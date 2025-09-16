@@ -77,13 +77,13 @@ function AppTopBar({
           <h1 className="text-xl font-bold text-gray-900">{t("app.title")}</h1>
         </div>
 
-        <div className="flex items-center pl-3 space-x-3">
+        <div className="flex items-center pl-3 space-x-1">
           <LanguageSwitcher />
-          {showNotifications && (
+          {/* {showNotifications && (
             <button className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
               <Bell className="w-5 h-5 text-gray-600" />
             </button>
-          )}
+          )} */}
 
           {showSettings && (
             <button className="p-2 rounded-lg hover:bg-gray-100 transition-colors">

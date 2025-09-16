@@ -1,8 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Bell, Settings, LogOut } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import LanguageSwitcher from "./LanguageSwitcher";
 
-function AppTopBar({ title = "FixMyCity", showNotifications = true, showSettings = false }) {
+function AppTopBar({
+  title = "FixMyCity",
+  showNotifications = true,
+  showSettings = false,
+}) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [userData, setUserData] = useState(null);
 
@@ -21,12 +28,14 @@ function AppTopBar({ title = "FixMyCity", showNotifications = true, showSettings
   const getUserName = () => {
     if (userData?.user_metadata?.email) {
       const email = userData.user_metadata.email;
-      const nameFromEmail = email.split('@')[0];
+      const nameFromEmail = email.split("@")[0];
       return nameFromEmail
-        .replace(/[._-]/g, ' ')
-        .split(' ')
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-        .join(' ');
+        .replace(/[._-]/g, " ")
+        .split(" ")
+        .map(
+          (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+        )
+        .join(" ");
     }
     if (userData?.profile?.name) {
       return userData.profile.name;
@@ -36,7 +45,7 @@ function AppTopBar({ title = "FixMyCity", showNotifications = true, showSettings
 
   const getUserInitials = () => {
     const name = getUserName();
-    const nameParts = name.split(' ');
+    const nameParts = name.split(" ");
     if (nameParts.length >= 2) {
       return `${nameParts[0][0]}${nameParts[1][0]}`.toUpperCase();
     }
@@ -47,7 +56,7 @@ function AppTopBar({ title = "FixMyCity", showNotifications = true, showSettings
     // Clear all user-related data from localStorage
     localStorage.removeItem("user");
     localStorage.removeItem("token");
-    
+
     // Redirect to login page
     navigate("/login");
   };
@@ -57,39 +66,40 @@ function AppTopBar({ title = "FixMyCity", showNotifications = true, showSettings
       <div className="flex items-center justify-between px-4 py-3">
         <div className="flex items-center space-x-3">
           <div className="relative">
-    <div className="w-9 h-9 bg-blue-50 rounded-xl flex items-center justify-center shadow-sm border border-blue-100">
-      <img 
-        className="w-7 h-7 rounded-lg object-cover" 
-        src="/FixMyCityLogo.jpeg" 
-        alt="FixMyCity Logo" 
-      />
-    </div>
-  </div>
-          <h1 className="text-xl font-bold text-gray-900">{title}</h1>
+            <div className="w-9 h-9 bg-blue-50 rounded-xl flex items-center justify-center shadow-sm border border-blue-100">
+              <img
+                className="w-7 h-7 rounded-lg object-cover"
+                src="/FixMyCityLogo.jpeg"
+                alt="FixMyCity Logo"
+              />
+            </div>
+          </div>
+          <h1 className="text-xl font-bold text-gray-900">{t("app.title")}</h1>
         </div>
-        
-        <div className="flex items-center space-x-3">
-          {showNotifications && (
+
+        <div className="flex items-center pl-3 space-x-1">
+          <LanguageSwitcher />
+          {/* {showNotifications && (
             <button className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
               <Bell className="w-5 h-5 text-gray-600" />
             </button>
-          )}
-          
+          )} */}
+
           {showSettings && (
             <button className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
               <Settings className="w-5 h-5 text-gray-600" />
             </button>
           )}
-          
+
           <button
             onClick={handleLogout}
             className="flex items-center space-x-2 px-3 py-2 text-sm text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-            title="Logout"
+            title={t("common.logout")}
           >
             <LogOut className="w-4 h-4" />
-            <span className="hidden sm:inline">Logout</span>
+            <span className="hidden sm:inline">{t("common.logout")}</span>
           </button>
-          
+
           <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
             <span className="text-white text-sm font-semibold">
               {getUserInitials()}

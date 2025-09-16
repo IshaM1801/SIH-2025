@@ -22,11 +22,15 @@ const authMiddleware = async (req, res, next) => {
     } catch (_) {
       // Not an employee token, try Supabase token
     }
-//.
+    //.
     // 2️⃣ Verify Supabase user token
-    const { data: { user }, error } = await supabase.auth.getUser(token);
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser(token);
 
-    if (error || !user) return res.status(401).json({ error: "Invalid or expired token" });
+    if (error || !user)
+      return res.status(401).json({ error: "Invalid or expired token" });
 
     req.user = {
       email: user.email,
@@ -36,7 +40,6 @@ const authMiddleware = async (req, res, next) => {
     };
 
     next();
-
   } catch (err) {
     console.error("Auth middleware error:", err);
     res.status(500).json({ error: "Server error" });

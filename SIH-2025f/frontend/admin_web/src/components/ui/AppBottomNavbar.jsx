@@ -1,6 +1,7 @@
 import React from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Home, FileText, PlusCircle, User } from "lucide-react";
+import { Home, FileText, PlusCircle, User, Users } from "lucide-react";
+
 
 function BottomNavbar() {
   const navigate = useNavigate();
@@ -12,6 +13,7 @@ function BottomNavbar() {
     if (path === "/my-issues" || path === "/my-reports") return "my-reports"; // ✅ Fix: Handle both paths
     if (path === "/report-issue") return "report";
     if (path === "/my-account") return "account";
+    if (path === "/community-issues") return "community";
     return "home";
   };
 
@@ -27,6 +29,12 @@ function BottomNavbar() {
       label: "My Reports",
       icon: FileText,
       path: "/my-reports",
+    },
+    {
+      id: "community",
+      label: "Community",
+      icon: Users,
+      path: "/community-issues",
     },
     {
       id: "report",
@@ -46,18 +54,18 @@ function BottomNavbar() {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 shadow-lg">
-      <div className="grid grid-cols-4 h-16">
+      <div className="grid grid-cols-5 h-16">
         {navItems.map((item) => {
           const isActive = activeTab === item.id;
           const Icon = item.icon;
-          
+
           return (
             <button
               key={item.id}
               onClick={() => navigate(item.path)}
               className={`flex flex-col items-center justify-center space-y-1 transition-colors ${
-                isActive 
-                  ? "text-blue-600 bg-blue-50" 
+                isActive
+                  ? "text-blue-600 bg-blue-50"
                   : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
               }`}
             >

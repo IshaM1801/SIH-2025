@@ -13,3 +13,20 @@ yarn-error.log*
 # Environment variables
 .env
 .env.local
+
+# Python Virtual Environments
+venv/
+__pycache__/
+*.pyc
+.venv
+
+# Environment variables
+.env
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Other
+.DS_Store

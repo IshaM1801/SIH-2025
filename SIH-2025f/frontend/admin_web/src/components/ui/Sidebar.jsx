@@ -1,22 +1,30 @@
-import React, { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import React from "react"; // No longer needs useState
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useTranslation } from 'react-i18next';
 import {
   Users,
   FileText,
   BarChart3,
   Sliders,
   GitBranch,
-  RefreshCw,
+  ArrowRightLeft,
   ShieldAlert,
-  Activity,
   MessageSquare,
   ChevronLeft,
+  Map as MapIcon,
   ChevronRight,
+  LogOut,
+  LineChart,
 } from "lucide-react";
 
-const Sidebar = ({ adminData }) => {
+// 1. Component now accepts isOpen and setIsOpen as props from the Layout
+const Sidebar = ({ adminData, isOpen, setIsOpen }) => {
+  const { t } = useTranslation();
   const location = useLocation();
-  const [isOpen, setIsOpen] = useState(true);
+  const navigate = useNavigate();
+
+  // 2. The internal state for isOpen has been REMOVED from this component.
+  // const [isOpen, setIsOpen] = useState(true); // <-- This line is deleted.
 
   const getAdminName = () => {
     if (adminData?.name) return adminData.name;
@@ -27,7 +35,7 @@ const Sidebar = ({ adminData }) => {
   const getAdminInitials = () => {
     const name = getAdminName();
     const nameParts = name.split(" ");
-    if (nameParts.length >= 2) {
+    if (nameParts.length >= 2 && nameParts[0] && nameParts[1]) {
       return `${nameParts[0][0]}${nameParts[1][0]}`.toUpperCase();
     }
     return name.substring(0, 2).toUpperCase();
@@ -39,45 +47,95 @@ const Sidebar = ({ adminData }) => {
     return "Administration";
   };
 
-  const sidebarItems = [
-    { icon: FileText, label: "Report Management", path: "/reports" },
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("adminData");
+    navigate("/login");
+  };
+
+  const groupedSidebarItems = [
     {
-      icon: Users,
-      label: "Citizen & Department Management",
-      path: "/citizens",
+      title: t('nav.workspace'),
+      items: [
+        { icon: FileText, label: t('nav.report_management'), path: "/reports" },
+        { icon: MapIcon, label: t('nav.map'), path: "/map" },
+        { icon: BarChart3, label: t('nav.analytics'), path: "/dashboard" },
+      ],
     },
-    { icon: BarChart3, label: "Analytics", path: "/dashboard" },
-    { icon: Sliders, label: "Issue Categories Setup", path: "/categories" },
     {
-      icon: GitBranch,
-      label: "AI agent efficiency calculator",
-      path: "/ai-efficiency",
+      title: t('nav.automation'),
+      items: [
+        {
+          icon: ArrowRightLeft,
+          label: t('nav.task_routing'),
+          path: "/task-routing",
+        },
+        {
+          icon: ShieldAlert,
+          label: t('nav.escalations'),
+          path: "/escalations",
+        },
+        {
+          icon: GitBranch,
+          label: t('nav.ai_efficiency'),
+          path: "/ai-efficiency",
+        },
+      ],
     },
-    { icon: RefreshCw, label: "Task Routing Module", path: "/task-routing" },
-    { icon: ShieldAlert, label: "Escalation Management", path: "/escalations" },
-    { icon: Activity, label: "Performance Monitoring", path: "/performance" },
     {
-      icon: MessageSquare,
-      label: "Citizen Communication",
-      path: "/communication",
+      title: t('nav.configuration'),
+      items: [
+        { icon: Users, label: t('nav.citizens'), path: "/citizens" },
+        { icon: Sliders, label: t('nav.categories'), path: "/categories" },
+        {
+          icon: MessageSquare,
+          label: t('nav.communication'),
+          path: "/communication",
+        },
+      ],
+    },
+    {
+      title: t('nav.monitoring'),
+      items: [
+        {
+          icon: LineChart,
+          label: t('nav.performance'),
+          path: "/performance",
+        },
+      ],
     },
   ];
 
   return (
     <div
       className={`${
-        isOpen ? "w-85" : "w-20"
-      } bg-white border-r border-gray-200 flex-shrink-0 shadow-sm transition-all duration-300 `}
+        isOpen ? "w-72" : "w-20"
+      } bg-white border-r border-gray-200 flex flex-col shadow-sm transition-all duration-300 h-screen fixed top-0 left-0 z-50`}
     >
-      <div className="p-4">
-        {/* Sidebar Header */}
-        <div className="flex items-center justify-between mb-8">
+      {/* Sidebar Header */}
+      <div className="p-4 pb-1 border-gray-200 flex-shrink-0">
+        <div className="flex items-center justify-between">
           {isOpen && (
-            <h1 className="text-xl font-semibold text-gray-900">Dashboard</h1>
+            <div className="flex items-center space-x-3">
+              <img
+                src="/icons/jharkhand-logo.png"
+                alt="Jharkhand Logo"
+                className=" h-15 rounded-lg object-cover"
+              />
+              <div className="flex flex-col">
+                <h1 className="text-xl font-bold text-gray-800 tracking-tight">
+                  {t('common.government_of')}
+                </h1>
+                <h1 className="text-xl pl-5 font-bold text-gray-800 tracking-tight">
+                  {t('common.jharkhand')}
+                </h1>
+              </div>
+            </div>
           )}
+          {/* 3. This button now uses the setIsOpen prop to change the state in the parent Layout component */}
           <button
             onClick={() => setIsOpen(!isOpen)}
-            className="p-2 rounded-lg hover:bg-gray-100"
+            className="p-2 ml-2 rounded-lg hover:bg-gray-100"
           >
             {isOpen ? (
               <ChevronLeft className="w-5 h-5 text-gray-600" />
@@ -86,50 +144,39 @@ const Sidebar = ({ adminData }) => {
             )}
           </button>
         </div>
-
-        {/* Sidebar Nav */}
-        <nav className="space-y-2 select-none">
-          {sidebarItems.map((item, index) => (
-            <Link
-              key={index}
-              to={item.path}
-              className={`flex items-center ${
-                isOpen ? "space-x-3" : "justify-center"
-              } px-4 py-3 rounded-xl transition-colors ${
-                location.pathname === item.path
-                  ? "bg-blue-50 text-blue-600 border border-blue-200"
-                  : "text-gray-600 hover:bg-gray-100"
-              }`}
-            >
-              <item.icon className="w-5 h-5 flex-shrink-0" />
-              {isOpen && (
-                <span className="text-sm font-medium truncate">
-                  {item.label}
-                </span>
-              )}
-            </Link>
-          ))}
-        </nav>
-
-        {/* Admin Info */}
-        <div className="mt-8 flex items-center space-x-3">
-          <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
-            <span className="text-white text-sm font-semibold">
-              {getAdminInitials()}
-            </span>
-          </div>
-          {isOpen && (
-            <div className="block min-w-0">
-              <div className="text-sm font-medium text-gray-900 truncate">
-                {getAdminName()}
-              </div>
-              <div className="text-xs text-gray-500 truncate">
-                {getAdminRole()}
-              </div>
-            </div>
-          )}
-        </div>
       </div>
+
+      {/* Navigation */}
+      <nav className="flex-grow p-4 pt-2 space-y-2 select-none overflow-y-auto">
+        {groupedSidebarItems.map((group, groupIndex) => (
+          <div key={groupIndex}>
+            {isOpen && (
+              <h3 className="px-4 pt-4 pb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                {group.title}
+              </h3>
+            )}
+            {group.items.map((item, itemIndex) => (
+              <Link
+                key={itemIndex}
+                to={item.path}
+                className={`flex items-center ${
+                  isOpen ? "justify-start space-x-3" : "justify-center mt-5"
+                } px-4 py-3  rounded-xl transition-colors ${
+                  location.pathname === item.path
+                    ? "bg-blue-50 text-blue-600 font-semibold"
+                    : "text-gray-600 hover:bg-gray-100 mt-2"
+                }`}
+                title={!isOpen ? item.label : ""}
+              >
+                <item.icon className="w-5 h-5 flex-shrink-0" />
+                {isOpen && (
+                  <span className="text-sm truncate">{item.label}</span>
+                )}
+              </Link>
+            ))}
+          </div>
+        ))}
+      </nav>
     </div>
   );
 };

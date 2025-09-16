@@ -1,36 +1,59 @@
 const express = require("express");
 const router = express.Router();
-const authMiddleware = require('../middleware/authMiddleware');
+const authMiddleware = require("../middleware/authMiddleware");
 const multer = require("multer");
 
 // Multer setup for file uploads
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
-
 const {
   getAllIssues,
   getUserIssues,
-  
- assignIssueToEmployee,
+  removeIssueAssignment, // 👈 expects this name
+  assignIssueToEmployee,
   classifyReport,
   getDeptIssues,
   updateIssueStatus,
-  fetchHeadIssues,
-createIssueWithLocation,} = require('../controllers/issuesController');
+  agentUpdateIssue,
+  createIssueWithLocation,
+  fetchAddress,
+} = require("../controllers/issuesController");
+
+const {
+  getCommentsForIssue,
+  createComment,
+} = require("../controllers/commentsController");
 
 // Routes
-router.get('/', authMiddleware, getAllIssues);
-router.get('/user/:userId', authMiddleware, getUserIssues);
-router.post('/create', authMiddleware, upload.single("photo"), createIssueWithLocation);
-router.get("/dept/:issue_id",authMiddleware, getDeptIssues);
+router.get("/", getAllIssues);
+router.get("/user/:userId", authMiddleware, getUserIssues);
+router.post(
+  "/create",
+  authMiddleware,
+  upload.single("photo"),
+  createIssueWithLocation
+);
+// Fetch single issue by ID
+router.get("/dept/:issue_id", authMiddleware, getDeptIssues);
 
-// ✅ Fetch issues depending on role (Manager/HOD logic)
+// Fetch manager/HOD issues
 router.get("/dept", authMiddleware, getDeptIssues);
-router.patch('/update-status/:issueId', authMiddleware, updateIssueStatus);
+router.patch("/update-status/:issueId", authMiddleware, updateIssueStatus);
 router.post("/classify-report", authMiddleware, classifyReport);
+router.post(
+  "/agent-update/:issue_id",
+  authMiddleware,
+  upload.single("fixedImageFile"),
+  agentUpdateIssue
+);
+//fetch address for frontend
+router.post("/fetch-address", fetchAddress);
 
-router.post("/assign-issue",authMiddleware, assignIssueToEmployee)
+router.post("/assign-issue", authMiddleware, assignIssueToEmployee);
+router.post("/deassign", authMiddleware, removeIssueAssignment);
 
+//comment routes
+router.get("/comments/:issueId", getCommentsForIssue);
+router.post("/comments/:issueId", authMiddleware, createComment);
 
-//
 module.exports = router;

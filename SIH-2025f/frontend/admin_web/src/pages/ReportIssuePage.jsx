@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +9,7 @@ import { Camera, FileText, Image as ImageIcon, X, CheckCircle, AlertTriangle, Lo
 import PWALayout from "@/components/ui/PWALayout";
 
 function ReportIssuePage() {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({ issue_title: "", issue_description: "" });
   const [selectedImage, setSelectedImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
@@ -15,83 +17,70 @@ function ReportIssuePage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [coordinates, setCoordinates] = useState({ latitude: null, longitude: null });
-  const [address, setAddress] = useState("");
-  const [addressLoading, setAddressLoading] = useState(false); // ✅ Add loading state for address
+  const [address, setAddress] = useState(""); 
+  const [addressLoading, setAddressLoading] = useState(false);
 
+  // ✅ Simplified location fetching - only get coordinates
   useEffect(() => {
-    const fetchLocationAndAddress = async () => {
+    const fetchLocation = () => {
       if (navigator.geolocation) {
+        setAddressLoading(true);
         navigator.geolocation.getCurrentPosition(
-          async (position) => {
+          (position) => {
             const { latitude, longitude } = position.coords;
             console.log("📍 Fetched coordinates:", latitude, longitude);
-  
-            // ✅ Store as JSON in localStorage
+
+            // Store coordinates
             const coords = { latitude, longitude };
             setCoordinates(coords);
             localStorage.setItem("coords", JSON.stringify(coords));
             console.log("✅ Coordinates saved:", coords);
-  
-            try {
-              const token = localStorage.getItem("token");
-              setAddressLoading(true); // ✅ Start address loading
-  
-              // Handle both JSON and "lat,long" formats
-              const storedCoords = localStorage.getItem("coords");
-              let lat = latitude;
-              let lng = longitude;
-  
-              if (storedCoords) {
-                try {
-                  const parsed = JSON.parse(storedCoords); // ✅ JSON format
-                  lat = parsed.latitude;
-                  lng = parsed.longitude;
-                } catch (err) {
-                  // fallback for "lat,long" format
-                  if (storedCoords.includes(",")) {
-                    const [latStr, lngStr] = storedCoords.split(",");
-                    lat = parseFloat(latStr);
-                    lng = parseFloat(lngStr);
-                  }
-                }
-              }
-  
-              console.log("📡 Sending to backend:", lat, lng);
-  
-              const res = await fetch("http://localhost:5001/issues/fetch-address", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({ latitude, longitude }),
-              });
-  
-              const data = await res.json();
-              if (!res.ok) throw new Error(data.error || "Failed to fetch address");
-  
-              console.log("🏠 Address from backend:", data.address);
-              setAddress(data.address); // ✅ Store address in state
-            } catch (err) {
-              console.error("❌ Error fetching address:", err);
-              setAddress("Unable to fetch address"); // ✅ Set fallback address
-            } finally {
-              setAddressLoading(false); // ✅ Stop address loading
-            }
+            
+            // ✅ Fetch address from backend using the shared function
+            fetchAddressFromBackend(latitude, longitude);
           },
           (err) => {
             console.warn("⚠️ Geolocation error:", err.message);
             setAddressLoading(false);
+            setAddress("Location access denied");
           },
           { enableHighAccuracy: true, timeout: 10000 }
         );
       } else {
         console.warn("⚠️ Geolocation is not supported by this browser");
+        setAddress("Geolocation not supported");
       }
     };
-  
-    fetchLocationAndAddress();
+
+    fetchLocation();
   }, []);
+
+  // ✅ Separate function to fetch address (for preview purposes)
+  const fetchAddressFromBackend = async (latitude, longitude) => {
+    try {
+      const token = localStorage.getItem("token");
+      
+      const res = await fetch("http://localhost:5001/issues/fetch-address", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ latitude, longitude }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to fetch address");
+
+      console.log("🏠 Address from backend:", data.address);
+      setAddress(data.address);
+    } catch (err) {
+      console.error("❌ Error fetching address:", err);
+      setAddress("Unable to fetch address");
+    } finally {
+      setAddressLoading(false);
+    }
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -138,6 +127,7 @@ function ReportIssuePage() {
     setImagePreview(null);
   };
   
+  // ✅ Updated submit handler - uses enhanced create route
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -172,7 +162,7 @@ function ReportIssuePage() {
         payload.append("longitude", storedCoords.longitude);
       }
 
-      // POST to /issues/create
+      // ✅ Single API call to enhanced create route
       const response = await fetch("http://localhost:5001/issues/create", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
@@ -182,7 +172,12 @@ function ReportIssuePage() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Issue submission failed");
 
-      // Classification (optional)
+      console.log("✅ Issue created:", data);
+
+      // ✅ Get address from create response (if available) or use preview address
+      const resolvedAddress = data.location?.address || address || "your area";
+
+      // Classification (optional but recommended)
       const classifyRes = await fetch("http://localhost:5001/issues/classify-report", {
         method: "POST",
         headers: {
@@ -193,15 +188,26 @@ function ReportIssuePage() {
       });
 
       const classifyData = await classifyRes.json();
-      if (!classifyRes.ok) throw new Error(classifyData.error || "Classification failed");
-
-      setSuccess(`Your report has been submitted to the ${classifyData.department} department.`);
+      if (!classifyRes.ok) {
+        console.warn("Classification failed:", classifyData.error);
+        // Don't fail the entire submission if classification fails
+        setSuccess(`✅ Your report has been submitted successfully at ${resolvedAddress}. Classification pending.`);
+      } else {
+        setSuccess(`✅ Your report has been submitted to the ${classifyData.department} department at ${resolvedAddress}.`);
+      }
 
       // Reset form
       setFormData({ issue_title: "", issue_description: "" });
       setSelectedImage(null);
       setImagePreview(null);
+
+      // ✅ Optional: Navigate to reports page after success
+      setTimeout(() => {
+        navigate("/my-reports");
+      }, 3000);
+
     } catch (err) {
+      console.error("❌ Submission error:", err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -219,9 +225,9 @@ function ReportIssuePage() {
         {/* ✅ Enhanced Location Display */}
         {coordinates.latitude && coordinates.longitude && (
           <Card className="mb-6 border-blue-200 bg-blue-50">
-            <CardContent>
+            <CardContent className="p-4">
               <div className="space-y-3">
-                {/* ✅ Address Section - Display above coordinates */}
+                {/* ✅ Address Section - Display prominently */}
                 <div className="flex items-start space-x-3">
                   <MapPin className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
                   <div className="flex-1">
@@ -239,11 +245,11 @@ function ReportIssuePage() {
                   </div>
                 </div>
                 
-                {/* ✅ Coordinates Section - Display below address */}
+                {/* ✅ Fixed Coordinates Section */}
                 <div className="flex items-center space-x-3 pt-2 border-t border-blue-200">
-                  <MapPin className="w-5 h-5 text-blue-500 flex-shrink-0" />
+                  <MapPin className="w-4 h-4 text-blue-500 flex-shrink-0" />
                   <div className="flex-1">
-                    <p className="text-xs text-gray-600 mb-1">GPS Coordinates</p>
+                    <p className="mt-3 text-xs text-gray-600 mb-1">GPS Coordinates</p>
                     <p className="text-blue-700 text-sm font-mono">
                       {coordinates.latitude.toFixed(6)}, {coordinates.longitude.toFixed(6)}
                     </p>

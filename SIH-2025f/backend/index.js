@@ -20,7 +20,7 @@ const PORT = process.env.PORT || 5001;
 // --- CORS setup (only once) ---
 app.use(
   cors({
-    origin: "http://localhost:5173", // ⚡️ make sure this matches your frontend URL
+    origin: "https://fixmycity-opal.vercel.app", // ⚡️ make sure this matches your frontend URL
     methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { API_BASE_URL } from "@/config/api";
 
 const AIefficiency = () => {
   const [data, setData] = useState(null);
@@ -9,7 +10,7 @@ const AIefficiency = () => {
   const fetchAIAnalysis = async () => {
     try {
       const token = localStorage.getItem("employee_token"); // assuming JWT token
-      const res = await fetch("http://localhost:5001/ai/all-manager-issues", {
+      const res = await fetch(`${API_BASE_URL}/ai/all-manager-issues`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },

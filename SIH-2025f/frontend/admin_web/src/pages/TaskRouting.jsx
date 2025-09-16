@@ -7,6 +7,7 @@ import {
   AlertCircle,
   Upload,
 } from "lucide-react";
+import { API_BASE_URL } from "@/config/api";
 
 // Loader in center
 const Loader = () => (
@@ -27,7 +28,7 @@ const TaskRouting = () => {
   // --- Fetch tasks ---
   const fetchTasks = async () => {
     try {
-      const resMe = await fetch("http://localhost:5001/employee/me", {
+      const resMe = await fetch(`${API_BASE_URL}/employee/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!resMe.ok) throw new Error(`HTTP ${resMe.status}`);
@@ -40,7 +41,7 @@ const TaskRouting = () => {
         return;
       }
 
-      const resTasks = await fetch(`http://localhost:5001/issues/dept`, {
+      const resTasks = await fetch(`${API_BASE_URL}/issues/dept`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!resTasks.ok) throw new Error(`HTTP ${resTasks.status}`);
@@ -75,8 +76,7 @@ const TaskRouting = () => {
       setAiLoading((prev) => ({ ...prev, [issue_id]: true }));
 
       try {
-        const res = await fetch(
-          `http://localhost:5001/issues/agent-update/${issue_id}`,
+        const res = await fetch(`${API_BASE_URL}/issues/agent-update/${issue_id}`,
           {
             method: "POST",
             headers: { Authorization: `Bearer ${token}` },

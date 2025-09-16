@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { API_BASE_URL } from "@/config/api"; // ✅ Import API config
 import { 
   User, 
   Mail, 
@@ -40,11 +41,11 @@ function UserAccount() {
   const [profileLoading, setProfileLoading] = useState(true);
   const [message, setMessage] = useState("");
   
-  // ✅ Add state for reports data
+  // Add state for reports data
   const [reports, setReports] = useState([]);
   const [reportsLoading, setReportsLoading] = useState(true);
 
-  // ✅ Fetch user reports for statistics
+  // ✅ Updated fetchUserReports with API config
   const fetchUserReports = async () => {
     try {
       const token = localStorage.getItem("token");
@@ -53,7 +54,8 @@ function UserAccount() {
         return;
       }
 
-      const response = await fetch("http://localhost:5001/user/my-reports", {
+      // ✅ Using API_BASE_URL from config
+      const response = await fetch(`${API_BASE_URL}/user/my-reports`, {
         headers: {
           "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json"
@@ -75,7 +77,7 @@ function UserAccount() {
     }
   };
 
-  // ✅ Calculate real statistics from reports data
+  // Calculate real statistics from reports data
   const getAccountStats = () => {
     if (reportsLoading || !reports.length) {
       return {
@@ -111,7 +113,7 @@ function UserAccount() {
 
   const accountStats = getAccountStats();
 
-  // ✅ Fetch profile data from database
+  // ✅ Updated fetchProfileData with API config
   const fetchProfileData = async () => {
     try {
       const token = localStorage.getItem("token");
@@ -121,7 +123,8 @@ function UserAccount() {
         return;
       }
 
-      const response = await fetch("http://localhost:5001/user/profile", {
+      // ✅ Using API_BASE_URL from config
+      const response = await fetch(`${API_BASE_URL}/user/profile`, {
         headers: {
           "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json"
@@ -145,11 +148,13 @@ function UserAccount() {
     }
   };
 
-  // ✅ Fetch user profile from profiles table
+  // ✅ Updated fetchUserProfile with API config
   const fetchUserProfile = async (userId) => {
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch(`http://localhost:5001/user/profile-details/${userId}`, {
+      
+      // ✅ Using API_BASE_URL from config
+      const response = await fetch(`${API_BASE_URL}/user/profile-details/${userId}`, {
         headers: {
           "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json"
@@ -188,9 +193,9 @@ function UserAccount() {
           email: parsedData?.user_metadata?.email || parsedData?.email || ""
         });
         
-        // ✅ Fetch fresh data from database
+        // Fetch fresh data from database
         fetchProfileData();
-        // ✅ Fetch reports for statistics
+        // Fetch reports for statistics
         fetchUserReports();
       } catch (error) {
         console.error("Error parsing user data:", error);
@@ -218,7 +223,7 @@ function UserAccount() {
   };
 
   const getUserName = () => {
-    // ✅ Prioritize database data over localStorage
+    // Prioritize database data over localStorage
     if (profileData?.name) {
       return profileData.name;
     }
@@ -253,7 +258,7 @@ function UserAccount() {
     setEditedData(prev => ({ ...prev, [field]: value }));
   };
 
-  // ✅ Update the save function to actually save to database
+  // ✅ Updated handleSave with API config
   const handleSave = async () => {
     setLoading(true);
     setMessage("");
@@ -264,8 +269,8 @@ function UserAccount() {
         throw new Error("No authentication token found");
       }
 
-      // Call your profile update API endpoint
-      const response = await fetch("http://localhost:5001/user/update-profile", {
+      // ✅ Using API_BASE_URL from config
+      const response = await fetch(`${API_BASE_URL}/user/update-profile`, {
         method: "PATCH",
         headers: {
           "Authorization": `Bearer ${token}`,
@@ -333,13 +338,13 @@ function UserAccount() {
     navigate("/login");
   };
 
-  // ✅ Refresh reports function
+  // Refresh reports function
   const handleRefreshStats = async () => {
     setReportsLoading(true);
     await fetchUserReports();
   };
 
-  // ✅ Show loading state while fetching profile
+  // Show loading state while fetching profile
   if (!userData || profileLoading) {
     return (
       <PWALayout title="My Account" showNotifications={false}>
@@ -554,7 +559,7 @@ function UserAccount() {
           </CardContent>
         </Card>
 
-        {/* ✅ Enhanced Account Stats Card with Real Data */}
+        {/* Enhanced Account Stats Card with Real Data */}
         <Card className="mb-6">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
             <div>
@@ -597,7 +602,7 @@ function UserAccount() {
                   </div>
                 </div>
                 
-                {/* ✅ Additional stats row */}
+                {/* Additional stats row */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="text-center p-4 bg-yellow-50 rounded-lg border border-yellow-100">
                     <div className="flex items-center justify-center mb-2">
@@ -615,7 +620,7 @@ function UserAccount() {
                   </div>
                 </div>
 
-                {/* ✅ Success rate indicator */}
+                {/* Success rate indicator */}
                 {accountStats.totalReports > 0 && (
                   <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
                     <div className="flex items-center justify-between text-sm">
@@ -635,7 +640,7 @@ function UserAccount() {
                   </div>
                 )}
 
-                {/* ✅ Empty state */}
+                {/* Empty state */}
                 {accountStats.totalReports === 0 && (
                   <div className="text-center py-6">
                     <FileText className="w-12 h-12 text-gray-400 mx-auto mb-3" />

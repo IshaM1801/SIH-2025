@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Camera, FileText, Image as ImageIcon, X, CheckCircle, AlertTriangle, Loader2, MapPin } from "lucide-react";
 import PWALayout from "@/components/ui/PWALayout";
+import { API_BASE_URL } from "@/config/api";
 
 function ReportIssuePage() {
   const navigate = useNavigate();
@@ -60,7 +61,7 @@ function ReportIssuePage() {
     try {
       const token = localStorage.getItem("token");
       
-      const res = await fetch("http://localhost:5001/issues/fetch-address", {
+      const res = await fetch(`${API_BASE_URL}/issues/fetch-address`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -163,7 +164,7 @@ function ReportIssuePage() {
       }
 
       // ✅ Single API call to enhanced create route
-      const response = await fetch("http://localhost:5001/issues/create", {
+      const response = await fetch(`${API_BASE_URL}/issues/create`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
         body: payload,
@@ -178,7 +179,7 @@ function ReportIssuePage() {
       const resolvedAddress = data.location?.address || address || "your area";
 
       // Classification (optional but recommended)
-      const classifyRes = await fetch("http://localhost:5001/issues/classify-report", {
+      const classifyRes = await fetch(`${API_BASE_URL}/issues/classify-report`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

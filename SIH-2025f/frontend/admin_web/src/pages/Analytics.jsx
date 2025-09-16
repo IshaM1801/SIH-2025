@@ -5,6 +5,7 @@ import React, {
   useMemo,
   useRef,
 } from "react";
+import { API_BASE_URL } from "@/config/api";
 import CivicIssueMap from "./Map";
 // --- INLINE SVG ICONS ---
 const KpiIcon = ({ icon, colorClass, bgClass }) => (
@@ -791,7 +792,7 @@ const ManagerDashboard = () => {
     }
 
     try {
-      const response = await fetch("http://localhost:5001/issues/dept", {
+      const response = await fetch(`${API_BASE_URL}/issues/dept`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!response.ok) {

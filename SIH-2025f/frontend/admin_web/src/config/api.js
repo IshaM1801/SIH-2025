@@ -1,9 +1,9 @@
 // Dynamic API configuration for different environments
 const getApiBaseUrl = () => {
   // Check for environment variable first (production deployment)
-  if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
-  }
+  // if (import.meta.env.VITE_API_URL) {
+  //   return import.meta.env.VITE_API_URL;
+  // }
   
   // Check deployment environment
   const hostname = window.location.hostname;
@@ -18,8 +18,8 @@ const getApiBaseUrl = () => {
     return "http://localhost:5001";
   }
   
-  // Fallback to production
-  return "https://sih-2025-pbef.onrender.com";
+  // Fallback to local
+  return "http://localhost:5001";
 };
 
 export const API_BASE_URL = getApiBaseUrl();

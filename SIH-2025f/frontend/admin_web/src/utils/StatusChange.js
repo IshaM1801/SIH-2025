@@ -1,4 +1,5 @@
 import axios from "axios";
+import { API_BASE_URL } from "../config/api.js";
 
 export const updateIssueStatus = async (issueId, newStatus) => {
   try {
@@ -6,7 +7,7 @@ export const updateIssueStatus = async (issueId, newStatus) => {
     if (!token) throw new Error("No token found in localStorage");
 
     const response = await axios.patch(
-      `http://localhost:5001/issues/update-status/${issueId}`,
+      `${API_BASE_URL}/issues/update-status/${issueId}`,
       { status: newStatus },
       {
         headers: {

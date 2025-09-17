@@ -1,4 +1,5 @@
 import React, { useEffect } from "react";
+import { API_BASE_URL } from "../config/api.js";
 
 const SendLocation = () => {
   useEffect(() => {
@@ -12,7 +13,7 @@ const SendLocation = () => {
           localStorage.setItem("coords", JSON.stringify({ latitude, longitude }));
 
           // Send to backend
-          fetch("http://localhost:5001/issues/fetch-location", {
+          fetch(`${API_BASE_URL}/issues/fetch-location`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ latitude, longitude }),

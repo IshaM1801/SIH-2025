@@ -17,6 +17,7 @@ import {
   Image as ImageIcon,
   Eye
 } from "lucide-react";
+import { API_BASE_URL } from "../config/api.js";
 
 function UserReports() {
   const navigate = useNavigate();
@@ -35,7 +36,7 @@ function UserReports() {
         return;
       }
 
-      const res = await fetch("http://localhost:5001/user/my-reports", {
+      const res = await fetch(`${API_BASE_URL}/user/my-reports`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 

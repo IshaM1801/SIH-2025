@@ -16,11 +16,11 @@ import {
   Shield,
   Trash2,
 } from "lucide-react";
+import { API_BASE_URL } from "@/config/api";
 
 import axios from "axios";
 import { jwtDecode } from "jwt-decode";
 // --- Configuration ---
-const API_BASE_URL = "http://localhost:5001";
 
 const getAuthToken = () => {
   return localStorage.getItem("employee_token");
@@ -758,7 +758,7 @@ const CitizenCommunication = () => {
   const fetchIssues = useCallback(async () => {
     try {
       setIsLoading(true);
-      const res = await fetch("http://localhost:5001/issues/dept", {
+      const res = await fetch(`${API_BASE_URL}/issues/dept`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 

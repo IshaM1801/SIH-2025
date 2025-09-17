@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Check } from 'lucide-react';
 import StatusDropdown from '@/components/ui/StatusDropdown';
+import { API_BASE_URL } from "../../config/api.js";
 
 const DepartmentIssuesComponent = () => {
   const [selectedIssues, setSelectedIssues] = useState([]);
@@ -18,7 +19,7 @@ const DepartmentIssuesComponent = () => {
           return;
         }
 
-        const response = await fetch("http://localhost:5001/issues/dept", {
+        const response = await fetch(`${API_BASE_URL}/issues/dept`, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",

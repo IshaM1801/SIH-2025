@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { Calendar } from "lucide-react";
 import IssueDetailModal from "../components/ui/IssueDetailModal";
+import { API_BASE_URL } from "@/config/api";
 
 // Status pill
 const StatusPill = ({ status }) => {
@@ -50,7 +51,7 @@ export default function IssueManager() {
   const fetchEmployees = useCallback(async () => {
     try {
       if (!token) return setError("Authentication required. Please login.");
-      const res = await fetch("http://localhost:5001/employee/team", {
+      const res = await fetch(`${API_BASE_URL}/employee/team`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -77,7 +78,7 @@ export default function IssueManager() {
         return;
       }
 
-      const res = await fetch("http://localhost:5001/issues/dept", {
+      const res = await fetch(`${API_BASE_URL}/issues/dept`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -108,7 +109,7 @@ export default function IssueManager() {
   const fetchManagerIssues = async (manager) => {
     try {
       const res = await fetch(
-        `http://localhost:5001/issues/dept?manager_email=${manager.emp_email}`,
+        `${API_BASE_URL}/issues/dept?manager_email=${manager.emp_email}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }

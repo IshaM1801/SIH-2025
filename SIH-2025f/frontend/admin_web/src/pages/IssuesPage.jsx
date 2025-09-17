@@ -22,6 +22,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { API_BASE_URL } from "@/config/api";
 
 function IssuesPage() {
   const navigate = useNavigate();
@@ -55,7 +56,7 @@ function IssuesPage() {
           return;
         }
 
-        const res = await fetch("http://localhost:5001/user/my-reports", {
+        const res = await fetch(`${API_BASE_URL}/user/my-reports`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 

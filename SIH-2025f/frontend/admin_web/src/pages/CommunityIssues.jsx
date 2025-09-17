@@ -18,6 +18,7 @@ import {
   Loader2,
   RefreshCw
 } from "lucide-react";
+import { API_BASE_URL } from "@/config/api";
 
 import axios from "axios";
 import { jwtDecode } from "jwt-decode";
@@ -27,7 +28,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
 // --- Configuration ---
-const API_BASE_URL = "http://localhost:5001";
 
 const getAuthToken = () => {
   return localStorage.getItem("token");
@@ -672,7 +672,7 @@ const CommunityIssues = () => {
     }
 
     try {
-      const res = await fetch("http://localhost:5001/issues", {
+      const res = await fetch(`${API_BASE_URL}/issues`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 

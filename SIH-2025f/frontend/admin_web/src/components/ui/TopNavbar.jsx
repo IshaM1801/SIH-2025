@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Bell, Search, Plus, Settings, User, LogOut } from "lucide-react";
 import { useTranslation } from 'react-i18next';
 import LanguageSwitcher from './LanguageSwitcher';
+import { API_BASE_URL } from "@/config/api";
 
 // --- Data Processing Function (now inside the same file) ---
 const calculateIssueKpis = (apiData) => {
@@ -63,7 +64,7 @@ const Navbar = ({ adminData }) => {
 
       try {
         // --- 3. Add the token to the fetch request headers ---
-        const response = await fetch("http://localhost:5001/issues/dept", {
+        const response = await fetch(`${API_BASE_URL}/issues/dept`, {
           headers: {
             Authorization: `Bearer ${token}`, // Standard Bearer token format
             "Content-Type": "application/json",

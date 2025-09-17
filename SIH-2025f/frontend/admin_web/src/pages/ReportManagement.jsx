@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { API_BASE_URL } from "../config/api.js";
 
 // --- INLINE SVG ICONS (with additions) ---
 const icons = {
@@ -508,10 +509,10 @@ const ReportManagementPage = () => {
     try {
       if (!token) return;
       const [issuesRes, teamRes] = await Promise.all([
-        fetch("http://localhost:5001/issues/dept", {
+        fetch(`${API_BASE_URL}/issues/dept`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        fetch("http://localhost:5001/employee/team", {
+        fetch(`${API_BASE_URL}/employee/team`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
       ]);
@@ -579,7 +580,7 @@ const ReportManagementPage = () => {
   const assignMultipleEmployees = (issueId, emp_emails) =>
     handleApiAction(
       async () => {
-        const res = await fetch("http://localhost:5001/issues/assign-issue", {
+        const res = await fetch(`${API_BASE_URL}/issues/assign-issue`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -597,7 +598,7 @@ const ReportManagementPage = () => {
   const deassignIssue = (issueId) =>
     handleApiAction(
       async () => {
-        const res = await fetch("http://localhost:5001/issues/deassign", {
+        const res = await fetch(`${API_BASE_URL}/issues/deassign`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -616,7 +617,7 @@ const ReportManagementPage = () => {
     handleApiAction(
       async () => {
         const res = await fetch(
-          `http://localhost:5001/issues/update-status/${issueId}`,
+          `${API_BASE_URL}/issues/update-status/${issueId}`,
           {
             method: "PATCH",
             headers: {

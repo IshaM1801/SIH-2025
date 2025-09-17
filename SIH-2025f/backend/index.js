@@ -20,10 +20,34 @@ const PORT = process.env.PORT || 5001;
 // --- CORS setup (only once) ---
 app.use(
   cors({
-    origin: "https://fixmycity-opal.vercel.app", // ⚡️ make sure this matches your frontend URL
+    origin: function (origin, callback) {
+      // ✅ Allow requests with no origin (mobile apps, Postman, etc.)
+      if (!origin) return callback(null, true);
+      
+      const allowedOrigins = [
+        "http://localhost:5173",                // ✅ Local development
+        "http://127.0.0.1:5173",              // ✅ Alternative localhost
+        "https://fixmycity-opal.vercel.app",   // ✅ Your Vercel deployment
+      ];
+      
+      // ✅ Check exact matches
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      
+      // ✅ Allow any Vercel subdomain
+      if (origin.includes('.vercel.app')) {
+        return callback(null, true);
+      }
+      
+      console.log(`🌐 CORS request from: ${origin}`);
+      console.warn(`❌ CORS blocked origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    },
     methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
+    optionsSuccessStatus: 200, // For legacy browser support
   })
 );
 

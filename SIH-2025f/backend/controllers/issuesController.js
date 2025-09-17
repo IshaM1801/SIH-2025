@@ -3,6 +3,7 @@ const axios = require("axios");
 const { sendWhatsAppMessage } = require("../services/whatsappService");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const fetch = require("node-fetch");
 
 // ✅ Create a shared reverse geocoding function
 const reverseGeocode = async (latitude, longitude) => {
@@ -400,6 +401,26 @@ const getDeptIssues = async (req, res) => {
   }
 };
 
+/**
+ * @param {string} url The public URL of the image.
+ * @returns {Promise<Buffer>} A promise that resolves with the image data as a Buffer.
+ */
+const fetchImageAsBuffer = async (url) => {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(
+        `Failed to fetch image. Status: ${response.status} ${response.statusText}`
+      );
+    }
+    const arrayBuffer = await response.arrayBuffer();
+    return Buffer.from(arrayBuffer);
+  } catch (error) {
+    console.error(`Error fetching image from ${url}:`, error.message);
+    throw error;
+  }
+};
+
 const agentUpdateIssue = async (req, res) => {
   console.log("🟢 agentUpdateIssue invoked");
   try {
@@ -415,9 +436,10 @@ const agentUpdateIssue = async (req, res) => {
     console.log(`➡️ Received update for issue_id: ${issue_id}`);
 
     // 2. Upload "Fixed" Image to Supabase Storage
+    // **NOTE: Changed bucket to 'issue-resolutions' as per previous discussion.**
     const fileName = `resolved-${issue_id}-${Date.now()}`;
     const { error: uploadError } = await supabase.storage
-      .from("issue-photos")
+      .from("issue-resolutions")
       .upload(fileName, fixedImageFile.buffer, {
         contentType: fixedImageFile.mimetype,
       });
@@ -428,7 +450,7 @@ const agentUpdateIssue = async (req, res) => {
     }
 
     const { data: urlData } = supabase.storage
-      .from("issue-photos")
+      .from("issue-resolutions")
       .getPublicUrl(fileName);
     const fixedImageUrl = urlData.publicUrl;
     console.log("✅ 'Fixed' image uploaded:", fixedImageUrl);
@@ -446,10 +468,9 @@ const agentUpdateIssue = async (req, res) => {
     }
     console.log("✅ Fetched original issue:", originalIssue.issue_title);
 
-    // 4. AI Verification with Gemini (NEW RELIABLE METHOD)
+    // 4. AI Verification with Gemini
     console.log("🤖 Downloading images to send to Gemini...");
 
-    // Use our helper function to get the image data for both images
     const originalImagePart = await urlToGenerativePart(
       originalIssue.image_url
     );
@@ -465,13 +486,13 @@ const agentUpdateIssue = async (req, res) => {
           parts: [
             {
               text: `You are an AI verification agent for a civic issue platform. Your task is to determine if a reported issue has been resolved based on two images and its description.
-          
-          Issue Title: "${originalIssue.issue_title}"
-          Issue Description: "${originalIssue.issue_description}"
+              
+              Issue Title: "${originalIssue.issue_title}"
+              Issue Description: "${originalIssue.issue_description}"
 
-          Analyze the 'Original Problem Image' (first image) and compare it to the 'Submitted Fix Image' (second image). Decide on a new status: 'resolved' or 'in progress' or 'pending'.
-          
-          Return ONLY a valid JSON object with the keys: "new_status" and "justification".`,
+              Analyze the 'Original Problem Image' (first image) and compare it to the 'Submitted Fix Image' (second image). Decide on a new status: 'resolved' or 'in progress' or 'pending'.
+              
+              Return ONLY a valid JSON object with the keys: "new_status" and "justification" and "post_text" which should be the text of the post to be posted on X.`,
             },
             originalImagePart,
             fixedImagePart,
@@ -482,19 +503,15 @@ const agentUpdateIssue = async (req, res) => {
 
     const result = await model.generateContent(prompt);
     const responseText = result.response.text();
-    console.log("📩 Gemini raw response:", responseText);
-
     const aiResponse = JSON.parse(responseText.replace(/```json\n?|```/g, ""));
+
     console.log("✅ Parsed AI response:", aiResponse);
 
-    // 5. Update Issue in Database with AI's Verdict
+    // 5. Update Issue Status in the 'issues' table
     const { data: updatedIssue, error: updateError } = await supabase
       .from("issues")
       .update({
         status: aiResponse.new_status,
-        resolved_image_url: fixedImageUrl,
-        // resolution_notes: aiResponse.justification,
-        // resolved_at: new Date().toISOString(),
       })
       .eq("issue_id", issue_id)
       .select("issue_id, issue_title, created_by")
@@ -506,7 +523,32 @@ const agentUpdateIssue = async (req, res) => {
     }
     console.log("✅ Issue status updated in DB to:", aiResponse.new_status);
 
-    // 7. Send Success Response to Frontend
+    // 6. Conditionally Create a Record in 'issue_posts'
+    if (aiResponse.new_status === "resolved" || "in progress") {
+      const { data, error } = await supabase
+        .from("issue_posts")
+        .insert([
+          {
+            issue_id: originalIssue.issue_id,
+            ai_generated_text: aiResponse.post_text,
+            before_image_url: originalIssue.image_url,
+            after_image_url: fixedImageUrl,
+            posted_to_x: false, // This is a flag for the background job
+          },
+        ])
+        .select();
+
+      if (error) {
+        console.error(
+          "❌ Supabase insert into issue_posts error:",
+          error.message
+        );
+        throw new Error("Failed to create post record.");
+      }
+      console.log("✅ Post record created in 'issue_posts'. Ready for X.");
+    }
+
+    // 7. Send Success Response
     res.json({
       success: true,
       message: "AI analysis complete and issue updated.",
@@ -525,6 +567,7 @@ const agentUpdateIssue = async (req, res) => {
       .json({ error: err.message || "An internal server error occurred." });
   }
 };
+
 // Add this function to issuesController.js
 const updateIssueStatus = async (req, res) => {
   const { issueId } = req.params;

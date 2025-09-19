@@ -17,6 +17,7 @@ const {
   agentUpdateIssue,
   createIssueWithLocation,
   fetchAddress,
+  fetchSentimentalAnalysis,
 } = require("../controllers/issuesController");
 
 const {
@@ -48,6 +49,9 @@ router.post(
 );
 //fetch address for frontend
 router.post("/fetch-address", fetchAddress);
+
+//fetch summary of sentimental analysis
+router.get("/summary/:issueId", authMiddleware, fetchSentimentalAnalysis);
 
 router.post("/assign-issue", authMiddleware, assignIssueToEmployee);
 router.post("/deassign", authMiddleware, removeIssueAssignment);

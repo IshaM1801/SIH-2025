@@ -865,6 +865,44 @@ const fetchAddress = async (req, res) => {
   }
 };
 
+const fetchSentimentalAnalysis = async (req, res) => {
+  // Must accept req and res
+  try {
+    // 🔑 MODIFICATION: Extract issueId from req.params, not req.query
+    const issueId = req.params.issueId; // <--- Changed from req.query.issueId
+
+    if (!issueId) {
+      // This shouldn't happen with the route defined as /:issueId, but is good practice
+      return res.status(400).json({ error: "Missing issueId in URL path." });
+    }
+
+    const { data, error } = await supabase
+      .from("issue_posts")
+      .select("sentiment_summary, overall_sentiment")
+      .eq("issue_id", issueId)
+      .maybeSingle();
+
+    console.log(`🔍 Sentiment analysis lookup for issue ID ${issueId}:`, data);
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data) {
+      return res.status(404).json({ error: "Sentiment data not found." });
+    }
+
+    // Send the data as a JSON response (standard Express pattern)
+    return res.json({
+      summary: data.sentiment_summary,
+      sentiment: data.overall_sentiment,
+    });
+  } catch (err) {
+    console.error("fetchSentimentalAnalysis error:", err);
+    return res.status(500).json({ error: "Internal server error." });
+  }
+};
+
 module.exports = {
   getAllIssues,
   getUserIssues,
@@ -876,4 +914,5 @@ module.exports = {
   agentUpdateIssue,
   createIssueWithLocation,
   fetchAddress,
+  fetchSentimentalAnalysis,
 };

@@ -18,6 +18,45 @@ import {
 } from "lucide-react";
 import { API_BASE_URL } from "@/config/api";
 
+const icons = {
+  Smile: ({ size = 16, ...props }) => (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <circle cx="12" cy="12" r="10"></circle>{" "}
+      <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>{" "}
+      <line x1="9" y1="9" x2="9.01" y2="9"></line>{" "}
+      <line x1="15" y1="9" x2="15.01" y2="9"></line>{" "}
+    </svg>
+  ),
+
+  Loader2: ({ className = "" }) => (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`animate-spin ${className}`}
+    >
+      <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+    </svg>
+  ),
+};
+
 import axios from "axios";
 import { jwtDecode } from "jwt-decode";
 // --- Configuration ---
@@ -501,17 +540,73 @@ const Comments = ({ issueId }) => {
   );
 };
 
+// Assume all needed icons (X, MapPin, Calendar, User, ThumbsUp, AlertTriangle, Copy, Loader2, Smile)
+// and SeverityBadge are available in scope.
+
 const IssueModal = ({ issue, onClose }) => {
   const [upvotes, setUpvotes] = useState(issue?.upvotes || 0);
   const [copied, setCopied] = useState(false);
+
+  // NEW STATE for sentiment analysis
+  const [sentimentData, setSentimentData] = useState(null);
+  const [sentimentLoading, setSentimentLoading] = useState(true);
+
+  const token = localStorage.getItem("employee_token");
+
   if (!issue) return null;
 
+  // --- SENTIMENT FETCHING LOGIC ---
+  useEffect(() => {
+    const fetchSentiment = async () => {
+      setSentimentLoading(true);
+      try {
+        // Use path parameter format to align with the recommended backend route: /summary/:issueId
+        const res = await fetch(
+          `${API_BASE_URL}/issues/summary/${issue.issue_id}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+
+        if (!res.ok) {
+          const errorBody = await res
+            .json()
+            .catch(() => ({ error: "Server error occurred" }));
+          throw new Error(
+            errorBody.error ||
+              `Failed to fetch sentiment (Status: ${res.status})`
+          );
+        }
+
+        const data = await res.json();
+        setSentimentData(data); // expected { summary: string, sentiment: string }
+      } catch (err) {
+        console.error("Error fetching sentiment:", err);
+        setSentimentData(null);
+      } finally {
+        setSentimentLoading(false);
+      }
+    };
+
+    fetchSentiment();
+  }, [issue.issue_id, token]);
+
+  // --- UTILITY FUNCTIONS ---
   const copyCoordinates = (value) => {
     if (navigator.clipboard) {
       navigator.clipboard.writeText(value);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
+  };
+
+  const getSentimentClasses = (sentiment) => {
+    const lowerSentiment = sentiment ? sentiment.toLowerCase() : "";
+    if (lowerSentiment.includes("positive"))
+      return "bg-green-100 text-green-800 border-green-200";
+    if (lowerSentiment.includes("negative"))
+      return "bg-red-100 text-red-800 border-red-200";
+    return "bg-yellow-100 text-yellow-800 border-yellow-200";
   };
 
   return (
@@ -537,8 +632,43 @@ const IssueModal = ({ issue, onClose }) => {
 
         <div className="flex-1 overflow-y-auto">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6">
-            {/* Basic Information */}
+            {/* Left Column */}
             <div className="lg:col-span-2 space-y-6">
+              {/* NEW: SENTIMENT ANALYSIS CARD */}
+              <div className="bg-white rounded-lg p-4 border shadow-sm">
+                <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                  <icons.Smile className="text-blue-500" size={20} />
+                  Public Sentiment Summary
+                </h3>
+
+                {sentimentLoading ? (
+                  <div className="flex items-center space-x-2 text-sm text-gray-500">
+                    <icons.Loader2 className="h-4 w-4" />
+                    <span>Analyzing community feedback...</span>
+                  </div>
+                ) : sentimentData?.sentiment ? (
+                  <div className="space-y-3">
+                    <div
+                      className={`text-sm font-bold w-fit px-3 py-1 rounded-full border ${getSentimentClasses(
+                        sentimentData.sentiment
+                      )}`}
+                    >
+                      Overall Sentiment: {sentimentData.sentiment}
+                    </div>
+                    <p className="text-sm text-gray-700 leading-relaxed">
+                      <strong>AI Summary:</strong>{" "}
+                      {sentimentData.summary ||
+                        "No detailed summary available."}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500 italic">
+                    No sentiment data found or analysis is not yet complete.
+                  </p>
+                )}
+              </div>
+
+              {/* Basic Information */}
               <div className="bg-gray-50 rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-3">
                   <div className="w-6 h-6 bg-blue-100 rounded flex items-center justify-center">
@@ -641,12 +771,11 @@ const IssueModal = ({ issue, onClose }) => {
                   />
                 </div>
               )}
-
-              <Comments issueId={issue.issue_id} isAdmin={true} />
             </div>
 
-            {/* Location Details Sidebar */}
+            {/* Sidebar */}
             <div className="space-y-4">
+              {/* Location Details */}
               <div className="bg-gray-50 rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-4">
                   <MapPin className="text-blue-600" size={20} />
@@ -700,6 +829,7 @@ const IssueModal = ({ issue, onClose }) => {
                 )}
               </div>
 
+              {/* Tagged Authorities */}
               <div className="bg-gray-50 rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-4">
                   <div className="w-5 h-5 bg-blue-100 rounded flex items-center justify-center">
@@ -714,6 +844,7 @@ const IssueModal = ({ issue, onClose }) => {
                 </p>
               </div>
 
+              {/* Actions */}
               <div className="bg-gray-50 rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-4">
                   <div className="w-5 h-5 bg-blue-100 rounded flex items-center justify-center">

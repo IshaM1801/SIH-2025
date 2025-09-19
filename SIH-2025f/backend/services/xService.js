@@ -87,7 +87,7 @@ const postSingleIssueToX = async (post) => {
 
     // Create tweet with text + media
     const tweet = await twitterClient.v2.tweet({
-      text: post.ai_generated_text || "🚀 Resolved issue update",
+      text: post.ai_generated_text || "🚀 Issue update",
       media: {
         media_ids: [beforeMediaId, afterMediaId],
       },

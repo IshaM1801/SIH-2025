@@ -208,6 +208,25 @@ const icons = {
       <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
     </svg>
   ),
+  Smile: ({ size = 16, ...props }) => (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <circle cx="12" cy="12" r="10"></circle>{" "}
+      <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>{" "}
+      <line x1="9" y1="9" x2="9.01" y2="9"></line>{" "}
+      <line x1="15" y1="9" x2="15.01" y2="9"></line>{" "}
+    </svg>
+  ),
   FileX: ({ size = 32 }) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -282,21 +301,75 @@ const SeverityBadge = ({ severity }) => (
 );
 
 // --- Modals ---
-
 const IssueModal = ({ issue, onClose }) => {
   const [upvotes, setUpvotes] = useState(issue?.upvotes || 0);
   const [copied, setCopied] = useState(false);
+
+  // NEW STATE for sentiment analysis
+  const [sentimentData, setSentimentData] = useState(null);
+  const [sentimentLoading, setSentimentLoading] = useState(true);
+
+  const token = localStorage.getItem("employee_token"); // Get token here
+
   if (!issue) return null;
 
+  // --- Fetch sentiment analysis ---
+  useEffect(() => {
+    const fetchSentiment = async () => {
+      setSentimentLoading(true);
+      try {
+        // 🔑 MODIFICATION: Change URL from query parameter to path parameter
+        const res = await fetch(
+          `${API_BASE_URL}/issues/summary/${issue.issue_id}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+
+        if (!res.ok) {
+          // Attempt to read error message from the response body if available
+          const errorBody = await res
+            .json()
+            .catch(() => ({ error: "Unknown server error" }));
+          throw new Error(
+            errorBody.error ||
+              `Failed to fetch sentiment (Status: ${res.status})`
+          );
+        }
+
+        const data = await res.json();
+        setSentimentData(data); // expected { summary, sentiment }
+      } catch (err) {
+        console.error("Error fetching sentiment:", err);
+        setSentimentData(null);
+      } finally {
+        setSentimentLoading(false);
+      }
+    };
+    fetchSentiment();
+  }, [issue.issue_id, token]);
+
+  // --- Copy helper ---
   const copyCoordinates = (value) => {
     navigator.clipboard.writeText(value);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // --- Sentiment badge helper ---
+  const getSentimentClasses = (sentiment) => {
+    const lowerSentiment = sentiment.toLowerCase();
+    if (lowerSentiment.includes("positive"))
+      return "bg-green-100 text-green-800 border-green-200";
+    if (lowerSentiment.includes("negative"))
+      return "bg-red-100 text-red-800 border-red-200";
+    return "bg-yellow-100 text-yellow-800 border-yellow-200";
+  };
+
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex justify-center items-center p-4 animate-in fade-in-0 duration-300">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        {/* Header */}
         <div className="bg-gray-100 p-4 border-b flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold text-gray-800">Report Details</h2>
           <button
@@ -307,17 +380,54 @@ const IssueModal = ({ issue, onClose }) => {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto pl-6 ">
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto pl-6">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left Section */}
             <div className="lg:col-span-2 space-y-6">
+              {/* Sentiment Analysis */}
+              <div className="bg-white rounded-lg p-4 border shadow-sm">
+                <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                  <icons.Smile className="text-blue-500" />
+                  Public Sentiment Summary
+                </h3>
+
+                {sentimentLoading ? (
+                  <div className="flex items-center space-x-2 text-sm text-gray-500">
+                    <icons.Loader2 className="h-4 w-4" />
+                    <span>Analyzing comments...</span>
+                  </div>
+                ) : sentimentData?.sentiment ? (
+                  <div className="space-y-3">
+                    <div
+                      className={`text-sm font-bold w-fit px-3 py-1 rounded-full border ${getSentimentClasses(
+                        sentimentData.sentiment
+                      )}`}
+                    >
+                      Overall Sentiment: {sentimentData.sentiment}
+                    </div>
+                    <p className="text-sm text-gray-700 italic">
+                      Summary: {sentimentData.summary || "No summary provided."}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500 italic">
+                    No public sentiment data found for this report.
+                  </p>
+                )}
+              </div>
+
+              {/* Basic Information */}
               <div className="bg-gray-50 rounded-lg p-4 border">
                 <h3 className="font-semibold text-gray-800 mb-4">
                   Basic Information
                 </h3>
+
                 <div className="space-y-4">
                   <p className="text-lg font-bold text-gray-900">
                     {issue.issue_title}
                   </p>
+
                   <div className="bg-white p-3 rounded-lg border">
                     <p className="text-gray-700 text-sm leading-relaxed">
                       {issue.issue_description}
@@ -325,6 +435,8 @@ const IssueModal = ({ issue, onClose }) => {
                   </div>
                 </div>
               </div>
+
+              {/* Issue Photo */}
               {issue.image_url && (
                 <div>
                   <h3 className="font-semibold text-gray-800 mb-2">
@@ -337,13 +449,16 @@ const IssueModal = ({ issue, onClose }) => {
                   />
                 </div>
               )}
-              {/* <Comments issueId={issue.issue_id} isAdmin={true} /> */}
             </div>
 
+            {/* Right Section */}
             <div className="space-y-4 mr-5">
+              {/* Details */}
               <div className="bg-gray-50 rounded-lg p-4 border">
                 <h3 className="font-semibold text-gray-800 mb-4">Details</h3>
+
                 <div className="space-y-4 text-sm">
+                  {/* Location */}
                   <div className="flex items-start gap-3">
                     <icons.MapPin className="text-gray-500 mt-1" />
                     <div>
@@ -351,6 +466,8 @@ const IssueModal = ({ issue, onClose }) => {
                       <p>{issue.address_component || "N/A"}</p>
                     </div>
                   </div>
+
+                  {/* Reported On */}
                   <div className="flex items-start gap-3">
                     <icons.Calendar className="text-gray-500 mt-1" />
                     <div>
@@ -363,6 +480,8 @@ const IssueModal = ({ issue, onClose }) => {
                       </p>
                     </div>
                   </div>
+
+                  {/* Reported By */}
                   <div className="flex items-start gap-3">
                     <icons.User className="text-gray-500 mt-1" />
                     <div>
@@ -370,25 +489,28 @@ const IssueModal = ({ issue, onClose }) => {
                       <p>{issue.profiles?.name || "Anonymous"}</p>
                     </div>
                   </div>
+
+                  {/* Severity */}
                   <div className="flex items-start gap-3">
                     <icons.AlertTriangle className="text-gray-500 mt-1" />
                     <div>
                       <p className="font-medium">Severity</p>
                       <div className="mt-1">
-                        {" "}
-                        <SeverityBadge
-                          severity={issue.priority || "Medium"}
-                        />{" "}
+                        <SeverityBadge severity={issue.priority || "Medium"} />
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
+
+              {/* Coordinates */}
               <div className="bg-gray-50 rounded-lg p-4 border">
                 <h3 className="font-semibold text-gray-800 mb-3">
                   Coordinates
                 </h3>
+
                 <div className="space-y-2">
+                  {/* Latitude */}
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-xs bg-white px-2 py-1 rounded border flex-1 truncate">
                       {issue.latitude}
@@ -400,6 +522,8 @@ const IssueModal = ({ issue, onClose }) => {
                       <icons.Copy />
                     </button>
                   </div>
+
+                  {/* Longitude */}
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-xs bg-white px-2 py-1 rounded border flex-1 truncate">
                       {issue.longitude}
@@ -411,6 +535,8 @@ const IssueModal = ({ issue, onClose }) => {
                       <icons.Copy />
                     </button>
                   </div>
+
+                  {/* Copy status */}
                   {copied && <p className="text-xs text-green-600">Copied!</p>}
                 </div>
               </div>
@@ -503,6 +629,8 @@ const ReportManagementPage = () => {
     status: "all",
     assignee: "all",
   });
+  const [sentimentData, setSentimentData] = useState(null);
+  const [sentimentLoading, setSentimentLoading] = useState(true);
 
   // --- Data Fetching ---
   const fetchData = useCallback(async () => {

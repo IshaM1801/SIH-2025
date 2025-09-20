@@ -30,3 +30,6 @@ dist/
 
 # Other
 .DS_Store
+
+
+SIH-2025f/backend_python/data/*.mp4

@@ -464,7 +464,7 @@ const Comments = ({ issueId }) => {
   if (isLoading) return <p className="text-gray-500">Loading comments...</p>;
 
   return (
-    <div className="mt-6">
+    <div className="p-6 bg-white rounded-lg shadow-sm border">
       <h3 className="text-xl font-bold mb-4 text-gray-800 flex items-center gap-2">
         <MessageSquare size={20} />
         Comments ({comments.length})
@@ -861,6 +861,9 @@ const IssueModal = ({ issue, onClose }) => {
                 </button>
               </div>
             </div>
+          </div>
+          <div className="p-6">
+            <Comments issueId={issue.issue_id} />
           </div>
         </div>
       </div>

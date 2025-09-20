@@ -20,6 +20,7 @@ import UserAccount from "./pages/UserAccount";
 import Map from "./pages/Map";
 import CertificatesPage from "./pages/CertificatesPage";
 import CommunityIssues from "./pages/CommunityIssues";
+import LiveVehicleMap from './pages/LiveVehicleMap';
 
 // Protected Route Components
 function AdminProtectedRoute({ children }) {
@@ -55,6 +56,14 @@ function App() {
             element={
               <AdminProtectedRoute>
                 <Map />
+              </AdminProtectedRoute>
+            }
+          />
+          <Route
+            path="/live-vehicle-map"
+            element={
+              <AdminProtectedRoute>
+                <LiveVehicleMap />
               </AdminProtectedRoute>
             }
           />

@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 3
+names: ['Potholes', 'pothole', 'potholes']
+
+roboflow:
+  workspace: derrick-macharia-x8ptf
+  project: pothole-detection-yvqpl
+  version: 1
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/derrick-macharia-x8ptf/pothole-detection-yvqpl/dataset/1

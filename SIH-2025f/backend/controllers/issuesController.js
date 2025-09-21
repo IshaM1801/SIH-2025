@@ -1,3 +1,5 @@
+//issue controller
+
 const supabase = require("../supabase");
 const axios = require("axios");
 const { sendWhatsAppMessage } = require("../services/whatsappService");
@@ -61,12 +63,42 @@ async function urlToGenerativePart(url) {
   }
 }
 
+// A helper function to upload a file to Supabase Storage
+const uploadFileToSupabase = async (file, folder) => {
+  // Use a unique file path to prevent naming conflicts
+  const filePath = `${folder}/${Date.now()}-${file.originalname}`;
+
+  // Upload the file's buffer to a bucket named 'media'
+  const { error } = await supabase.storage
+    .from("issue-media")
+    .upload(filePath, file.buffer, {
+      contentType: file.mimetype,
+      upsert: true,
+    });
+
+  if (error) {
+    throw new Error(`Failed to upload file: ${error.message}`);
+  }
+
+  // Get the public URL for the newly uploaded file
+  const { data } = supabase.storage.from("issue-media").getPublicUrl(filePath);
+  return data.publicUrl;
+};
+
 const createIssueWithLocation = async (req, res) => {
   try {
-    const { issue_title, issue_description, department, latitude, longitude } =
-      req.body;
+    const {
+      issue_title,
+      issue_description,
+      is_anonymous,
+      latitude,
+      longitude,
+    } = req.body;
     const user = req.user;
     const created_by = user.id;
+
+    const images = req.files?.photos || [];
+    const video = req.files?.video?.[0] || null;
 
     if (!issue_title || !issue_description) {
       return res.status(400).json({ error: "Missing required fields" });
@@ -80,9 +112,8 @@ const createIssueWithLocation = async (req, res) => {
       let clientIp =
         req.headers["x-forwarded-for"]?.split(",")[0] ||
         req.socket?.remoteAddress;
-
       if (!clientIp || clientIp === "::1" || clientIp === "127.0.0.1") {
-        clientIp = "8.8.8.8"; // fallback for localhost/dev
+        clientIp = "8.8.8.8";
       }
 
       try {
@@ -97,69 +128,21 @@ const createIssueWithLocation = async (req, res) => {
       }
     }
 
-    // 2️⃣ Reverse geocode with OpenCage
+    // 2️⃣ Reverse geocode address
     let formattedAddress = "Unknown location";
     if (lat && lng) {
-      try {
-        const openCageKey = process.env.OPENCAGE_KEY;
-        const geoCodeRes = await axios.get(
-          `https://api.opencagedata.com/geocode/v1/json?q=${lat}+${lng}&key=${openCageKey}&no_annotations=1`
-        );
-
-        if (geoCodeRes.data?.results?.length > 0) {
-          const c = geoCodeRes.data.results[0].components;
-          formattedAddress = [
-            c.suburb || c.neighbourhood || c.village,
-            c.city || c.town || c.village,
-            c.state,
-            c.country,
-          ]
-            .filter(Boolean)
-            .join(", ");
-        }
-      } catch (geoErr) {
-        console.warn("⚠️ Reverse geocode failed:", geoErr.message);
-      }
+      formattedAddress = await reverseGeocode(lat, lng);
     }
 
-    // 3️⃣ Handle image upload
-    let imageUrl = null;
-    if (req.file) {
-      try {
-        const file = req.file;
-        const fileExt = file.originalname.split(".").pop();
-        const fileName = `issues/${Date.now()}.${fileExt}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from("issue-photos")
-          .upload(fileName, file.buffer, {
-            cacheControl: "3600",
-            upsert: false,
-            contentType: file.mimetype,
-          });
-
-        if (uploadError) throw uploadError;
-
-        const { data: publicData } = supabase.storage
-          .from("issue-photos")
-          .getPublicUrl(fileName);
-
-        imageUrl = publicData.publicUrl;
-      } catch (uploadErr) {
-        console.error("⚠️ Image upload failed:", uploadErr.message);
-      }
-    }
-
-    // 4️⃣ Insert issue into Supabase
-    const { data, error } = await supabase
+    // 3️⃣ Insert the core issue first to get the issue_id
+    const { data: newIssue, error: issueError } = await supabase
       .from("issues")
       .insert([
         {
           issue_title,
           issue_description,
           created_by,
-          department: department || null,
-          image_url: imageUrl,
+          //is_anonymous: is_anonymous === "true",
           latitude: lat,
           longitude: lng,
           address_component: formattedAddress,
@@ -168,12 +151,56 @@ const createIssueWithLocation = async (req, res) => {
       .select()
       .single();
 
-    if (error) throw error;
+    if (issueError) throw issueError;
+
+    const issueId = newIssue.issue_id;
+
+    // 4️⃣ Upload and insert media files
+    const mediaToInsert = [];
+    const uploadPromises = [];
+
+    // Handle images
+    if (images.length > 0) {
+      images.forEach((image) => {
+        uploadPromises.push(
+          uploadFileToSupabase(image, "issues/images").then((url) => {
+            mediaToInsert.push({
+              issue_id: issueId,
+              file_url: url,
+              file_type: "image",
+            });
+          })
+        );
+      });
+    }
+
+    // Handle video
+    if (video) {
+      uploadPromises.push(
+        uploadFileToSupabase(video, "issues/videos").then((url) => {
+          mediaToInsert.push({
+            issue_id: issueId,
+            file_url: url,
+            file_type: "video",
+          });
+        })
+      );
+    }
+
+    await Promise.all(uploadPromises);
+
+    if (mediaToInsert.length > 0) {
+      const { error: mediaError } = await supabase
+        .from("issue_media")
+        .insert(mediaToInsert);
+
+      if (mediaError) throw mediaError;
+    }
 
     res.status(201).json({
       success: true,
       message: "Issue created successfully",
-      issue: data,
+      issue: newIssue,
       location: {
         latitude: lat,
         longitude: lng,
@@ -183,6 +210,33 @@ const createIssueWithLocation = async (req, res) => {
   } catch (err) {
     console.error("createIssueWithLocation error:", err);
     res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+const getIssueMedia = async (req, res) => {
+  const { issueId } = req.params;
+
+  try {
+    const { data: media, error } = await supabase
+      .from("issue_media")
+      .select("file_url, file_type")
+      .eq("issue_id", issueId);
+
+    if (error) {
+      console.error("Supabase media fetch error:", error);
+      return res.status(500).json({ error: "Failed to fetch issue media." });
+    }
+
+    if (!media || media.length === 0) {
+      return res
+        .status(404)
+        .json({ message: "No media found for this issue.", media: [] });
+    }
+
+    return res.status(200).json({ media });
+  } catch (err) {
+    console.error("getIssueMedia error:", err);
+    return res.status(500).json({ error: "Internal server error." });
   }
 };
 
@@ -915,4 +969,5 @@ module.exports = {
   createIssueWithLocation,
   fetchAddress,
   fetchSentimentalAnalysis,
+  getIssueMedia,
 };

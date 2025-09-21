@@ -1,6 +1,6 @@
 ultralytics 
 opencv-python 
-"Flask[async]" 
+Flask[async]
 flask-cors 
 requests 
 pandas

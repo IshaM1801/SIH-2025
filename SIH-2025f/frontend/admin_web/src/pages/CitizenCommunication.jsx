@@ -1,3 +1,5 @@
+//citizen communication
+
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   MapPin,
@@ -15,9 +17,16 @@ import {
   Upload,
   Shield,
   Trash2,
+  Smile,
+  Loader2,
+  Image,
+  Video,
+  ChevronLeft,
+  ChevronRight,
+  Maximize,
+  Download,
 } from "lucide-react";
 import { API_BASE_URL } from "@/config/api";
-
 const icons = {
   Smile: ({ size = 16, ...props }) => (
     <svg
@@ -546,14 +555,39 @@ const Comments = ({ issueId }) => {
 const IssueModal = ({ issue, onClose }) => {
   const [upvotes, setUpvotes] = useState(issue?.upvotes || 0);
   const [copied, setCopied] = useState(false);
-
+  const [issueMedia, setIssueMedia] = useState([]);
+  const [mediaLoading, setMediaLoading] = useState(true);
   // NEW STATE for sentiment analysis
   const [sentimentData, setSentimentData] = useState(null);
   const [sentimentLoading, setSentimentLoading] = useState(true);
+  // NEW STATE for image gallery
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
 
   const token = localStorage.getItem("employee_token");
 
   if (!issue) return null;
+
+  // --- MEDIA FETCHING LOGIC ---
+  useEffect(() => {
+    const fetchMedia = async () => {
+      setMediaLoading(true);
+      try {
+        // NOTE: You'll need to create a backend route for this: GET /issues/media/:issueId
+        const res = await fetch(
+          `${API_BASE_URL}/issues/media/${issue.issue_id}`
+        );
+        if (!res.ok) throw new Error("Failed to fetch issue media");
+        const data = await res.json();
+        setIssueMedia(data.media);
+      } catch (err) {
+        console.error("Error fetching media:", err);
+        setIssueMedia([]);
+      } finally {
+        setMediaLoading(false);
+      }
+    };
+    fetchMedia();
+  }, [issue.issue_id]);
 
   // --- SENTIMENT FETCHING LOGIC ---
   useEffect(() => {
@@ -609,6 +643,45 @@ const IssueModal = ({ issue, onClose }) => {
     return "bg-yellow-100 text-yellow-800 border-yellow-200";
   };
 
+  // Get all media (combine images and videos)
+  const getAllMedia = () => {
+    const media = [];
+
+    // Add media from issueMedia (both images and videos)
+    issueMedia.forEach((mediaItem) => {
+      media.push({
+        url: mediaItem.file_url,
+        type: mediaItem.file_type,
+        id: mediaItem.id || `media-${media.length}`,
+      });
+    });
+
+    // Add legacy image_url if it exists and isn't already in the list
+    if (issue.image_url && !media.some((m) => m.url === issue.image_url)) {
+      media.push({
+        url: issue.image_url,
+        type: "image",
+        id: "legacy-image",
+      });
+    }
+
+    return media;
+  };
+
+  const allMedia = getAllMedia();
+
+  const navigateMedia = (direction) => {
+    if (direction === "prev") {
+      setSelectedImageIndex((prev) =>
+        prev > 0 ? prev - 1 : allMedia.length - 1
+      );
+    } else {
+      setSelectedImageIndex((prev) =>
+        prev < allMedia.length - 1 ? prev + 1 : 0
+      );
+    }
+  };
+
   return (
     <div className="fixed inset-0 mt-0 pt-0 bg-black/50 z-50 flex justify-center items-center p-4 animate-in fade-in-0 duration-300">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
@@ -637,13 +710,13 @@ const IssueModal = ({ issue, onClose }) => {
               {/* NEW: SENTIMENT ANALYSIS CARD */}
               <div className="bg-white rounded-lg p-4 border shadow-sm">
                 <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                  <icons.Smile className="text-blue-500" size={20} />
+                  <Smile className="text-blue-500" size={20} />
                   Public Sentiment Summary
                 </h3>
 
                 {sentimentLoading ? (
                   <div className="flex items-center space-x-2 text-sm text-gray-500">
-                    <icons.Loader2 className="h-4 w-4" />
+                    <Loader2 className="h-4 w-4 animate-spin" />
                     <span>Analyzing community feedback...</span>
                   </div>
                 ) : sentimentData?.sentiment ? (
@@ -759,17 +832,142 @@ const IssueModal = ({ issue, onClose }) => {
                 </div>
               </div>
 
-              {issue.image_url && (
-                <div>
-                  <h3 className="font-semibold text-gray-800 mb-3">
-                    Issue Photo
-                  </h3>
-                  <img
-                    src={issue.image_url}
-                    alt="Issue"
-                    className="rounded-lg w-full h-64 object-cover border"
-                  />
+              {/* UPDATED: UNIFIED MEDIA GALLERY */}
+              {mediaLoading ? (
+                <div className="flex items-center justify-center h-48 bg-gray-100 rounded-lg">
+                  <Loader2 className="h-8 w-8 text-gray-400 animate-spin" />
                 </div>
+              ) : (
+                allMedia.length > 0 && (
+                  <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
+                    <div className="p-4 border-b bg-gray-50">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+                          {allMedia[selectedImageIndex]?.type === "video" ? (
+                            <Video className="text-blue-500" size={20} />
+                          ) : (
+                            <Image className="text-blue-500" size={20} />
+                          )}
+                          Issue Media
+                        </h3>
+                        <div className="flex items-center gap-3">
+                          <div className="bg-white px-3 py-1 rounded-full text-sm font-medium text-gray-600 border">
+                            {selectedImageIndex + 1} / {allMedia.length}
+                          </div>
+                          <div
+                            className={`px-2 py-1 rounded text-xs font-medium ${
+                              allMedia[selectedImageIndex]?.type === "video"
+                                ? "bg-purple-100 text-purple-700"
+                                : "bg-blue-100 text-blue-700"
+                            }`}
+                          >
+                            {allMedia[selectedImageIndex]?.type?.toUpperCase()}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Main Media Display */}
+                    <div className="relative bg-gray-900 aspect-video">
+                      {allMedia[selectedImageIndex]?.type === "video" ? (
+                        <video
+                          key={allMedia[selectedImageIndex]?.url} // Force re-render when switching videos
+                          src={allMedia[selectedImageIndex]?.url}
+                          controls
+                          className="w-full h-full object-contain"
+                          preload="metadata"
+                        />
+                      ) : (
+                        <img
+                          src={allMedia[selectedImageIndex]?.url}
+                          alt={`Issue media ${selectedImageIndex + 1}`}
+                          className="w-full h-full object-contain"
+                        />
+                      )}
+
+                      {/* Navigation Arrows */}
+                      {allMedia.length > 1 && (
+                        <>
+                          <button
+                            onClick={() => navigateMedia("prev")}
+                            className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors z-10"
+                          >
+                            <ChevronLeft size={20} />
+                          </button>
+                          <button
+                            onClick={() => navigateMedia("next")}
+                            className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors z-10"
+                          >
+                            <ChevronRight size={20} />
+                          </button>
+                        </>
+                      )}
+
+                      {/* Fullscreen and Download buttons */}
+                      <div className="absolute top-4 right-4 flex gap-2 z-10">
+                        <button
+                          onClick={() =>
+                            window.open(
+                              allMedia[selectedImageIndex]?.url,
+                              "_blank"
+                            )
+                          }
+                          className="bg-black/50 hover:bg-black/70 text-white rounded-lg p-2 transition-colors"
+                          title="View fullscreen"
+                        >
+                          <Maximize size={16} />
+                        </button>
+                        <a
+                          href={allMedia[selectedImageIndex]?.url}
+                          download
+                          className="bg-black/50 hover:bg-black/70 text-white rounded-lg p-2 transition-colors inline-block"
+                          title="Download media"
+                        >
+                          <Download size={16} />
+                        </a>
+                      </div>
+                    </div>
+
+                    {/* Thumbnail Navigation */}
+                    {allMedia.length > 1 && (
+                      <div className="p-4 bg-gray-50">
+                        <div className="flex gap-2 overflow-x-auto pb-2">
+                          {allMedia.map((mediaItem, index) => (
+                            <button
+                              key={mediaItem.id || index}
+                              onClick={() => setSelectedImageIndex(index)}
+                              className={`flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all relative ${
+                                index === selectedImageIndex
+                                  ? "border-blue-500 ring-2 ring-blue-200"
+                                  : "border-gray-300 hover:border-gray-400"
+                              }`}
+                            >
+                              {mediaItem.type === "video" ? (
+                                <div className="relative">
+                                  <video
+                                    src={mediaItem.url}
+                                    className="w-16 h-16 object-cover"
+                                    preload="metadata"
+                                    muted
+                                  />
+                                  <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                                    <Video className="text-white" size={16} />
+                                  </div>
+                                </div>
+                              ) : (
+                                <img
+                                  src={mediaItem.url}
+                                  alt={`Thumbnail ${index + 1}`}
+                                  className="w-16 h-16 object-cover"
+                                />
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
               )}
             </div>
 
@@ -870,7 +1068,6 @@ const IssueModal = ({ issue, onClose }) => {
     </div>
   );
 };
-
 // --- Main Application Component ---
 
 const CitizenCommunication = () => {

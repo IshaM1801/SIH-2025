@@ -3,14 +3,15 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
 const API_BASE_URL = 'http://127.0.0.1:5003';
-const START_LOCATION = [19.0760, 72.8777];
+const START_LOCATION = [19.093344596650404, 73.01000000000000];
 const MAP_ZOOM = 15;
 const POLLING_INTERVAL_MS = 3000;
 
 const vehicleIcon = L.icon({
-    iconUrl: 'https://cdn-icons-png.flaticon.com/64/3202/3202926.png', // Dark truck icon
+    iconUrl: 'https://cdn-icons-png.flaticon.com/64/3202/3202926.png', 
     iconSize: [80, 80]
 });
+
 const issueIcon = L.icon({
     iconUrl: 'https://cdn-icons-png.flaticon.com/64/684/684908.png',
     iconSize: [70, 70]
@@ -22,6 +23,7 @@ const LiveVehicleMap = () => {
     const issueMarkersRef = useRef({});
     const [lastUpdated, setLastUpdated] = useState(null);
     const [issues, setIssues] = useState([]);
+    const [skipNextFetch, setSkipNextFetch] = useState(false); // <--- flag to prevent poll overwrite
 
     // Fetch issues from server
     const fetchAllIssues = async () => {
@@ -38,7 +40,8 @@ const LiveVehicleMap = () => {
     const handleClearAllIssues = async () => {
         try {
             await fetch(`${API_BASE_URL}/clear_issues`, { method: 'POST' });
-            setIssues([]);
+            setIssues([]); // immediately update UI
+            setSkipNextFetch(true); // skip next poll to avoid snapping back
         } catch (error) {
             console.error("Error clearing issues:", error);
         }
@@ -55,6 +58,7 @@ const LiveVehicleMap = () => {
 
             // Optimistic UI update
             setIssues(currentIssues => currentIssues.filter(issue => issue.id !== issueId));
+            setSkipNextFetch(true); // skip next poll temporarily
 
             // Call backend to resolve
             await fetch(`${API_BASE_URL}/resolve_issue`, {
@@ -62,9 +66,6 @@ const LiveVehicleMap = () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ id: issueId })
             });
-
-            // Small delay before next fetch to avoid snapping back
-            setTimeout(fetchAllIssues, 1000);
 
         } catch (error) {
             console.error(`Error resolving issue ${issueId}:`, error);
@@ -101,15 +102,21 @@ const LiveVehicleMap = () => {
         };
 
         fetchAllIssues(); // Initial fetch
+
         const intervalId = setInterval(() => {
             updateVehicleLocation();
-            fetchAllIssues();
+
+            if (!skipNextFetch) {
+                fetchAllIssues();
+            } else {
+                setSkipNextFetch(false); // reset flag
+            }
         }, POLLING_INTERVAL_MS);
 
         return () => clearInterval(intervalId);
-    }, []);
+    }, [skipNextFetch]);
 
-    // Sync map markers with `issues` state
+    // Sync map markers with issues state
     useEffect(() => {
         if (!mapRef.current) return;
 
@@ -143,11 +150,19 @@ const LiveVehicleMap = () => {
 
     return (
         <div style={{ height: '100vh', width: '100%', position: 'relative' }}>
-            <div style={{ position: 'absolute', top: 10, right: 10, background: 'white', padding: '10px', zIndex: 1000, borderRadius: '5px', border: '1px solid #ccc', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div><strong>Live Status:</strong> {lastUpdated ? `Vehicle data updated at ${lastUpdated.toLocaleTimeString()}` : 'Waiting...'}</div>
+            <div style={{
+                position: 'absolute', top: 10, right: 10,
+                background: 'white', padding: '10px', zIndex: 1000,
+                borderRadius: '5px', border: '1px solid #ccc',
+                display: 'flex', flexDirection: 'column', gap: '8px'
+            }}>
+                <div>
+                    <strong>Live Status:</strong> {lastUpdated ? `Vehicle data updated at ${lastUpdated.toLocaleTimeString()}` : 'Waiting...'}
+                </div>
                 <div><strong>Active Issues:</strong> {issues.length}</div>
-                <button onClick={handleClearAllIssues} style={{ background: '#ef4444', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '5px', cursor: 'pointer' }}>
-                    Clear All Issues
+                <button onClick={handleClearAllIssues}
+                    style={{ background: '#ef4444', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '5px', cursor: 'pointer' }}>
+                    Clear Issues
                 </button>
             </div>
             <div id="live-map" style={{ height: '100%', width: '100%' }}></div>

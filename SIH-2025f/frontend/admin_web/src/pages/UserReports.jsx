@@ -2,20 +2,26 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PWALayout from "@/components/ui/PWALayout";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { 
-  FileText, 
-  MapPin, 
-  Calendar, 
-  Building, 
+import {
+  FileText,
+  MapPin,
+  Calendar,
+  Building,
   AlertCircle,
   CheckCircle,
   Clock,
   PlusCircle,
   RefreshCw,
   Image as ImageIcon,
-  Eye
+  Eye,
 } from "lucide-react";
 import { API_BASE_URL } from "../config/api.js";
 
@@ -28,7 +34,7 @@ function UserReports() {
 
   const fetchReports = async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
-    
+
     try {
       const token = localStorage.getItem("token");
       if (!token) {
@@ -53,11 +59,13 @@ function UserReports() {
       console.log("Fetched data:", data);
 
       // Handle both formats: array directly or { reports: [...] }
-      const processed = (Array.isArray(data) ? data : data.reports || []).map((report) => ({
-        ...report,
-        lat: report.latitude || report.lat || "N/A",
-        lng: report.longitude || report.lng || "N/A",
-      }));
+      const processed = (Array.isArray(data) ? data : data.reports || []).map(
+        (report) => ({
+          ...report,
+          lat: report.latitude || report.lat || "N/A",
+          lng: report.longitude || report.lng || "N/A",
+        })
+      );
 
       setReports(processed);
       setError(null);
@@ -118,24 +126,26 @@ function UserReports() {
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+    return date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
   const getReportStats = () => {
     const total = reports.length;
-    const resolved = reports.filter(r => 
-      r.status?.toLowerCase() === 'resolved' || 
-      r.status?.toLowerCase() === 'completed'
+    const resolved = reports.filter(
+      (r) =>
+        r.status?.toLowerCase() === "resolved" ||
+        r.status?.toLowerCase() === "completed"
     ).length;
-    const pending = reports.filter(r => 
-      r.status?.toLowerCase() === 'pending' || 
-      r.status?.toLowerCase() === 'submitted'
+    const pending = reports.filter(
+      (r) =>
+        r.status?.toLowerCase() === "pending" ||
+        r.status?.toLowerCase() === "submitted"
     ).length;
     const inProgress = total - resolved - pending;
 
@@ -166,7 +176,9 @@ function UserReports() {
           <Card className="border-red-200 bg-red-50">
             <CardContent className="p-6 text-center">
               <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
-              <h3 className="text-lg font-semibold text-red-900 mb-2">Error Loading Reports</h3>
+              <h3 className="text-lg font-semibold text-red-900 mb-2">
+                Error Loading Reports
+              </h3>
               <p className="text-red-700 mb-4">{error}</p>
               <Button onClick={() => fetchReports()} className="mr-2">
                 <RefreshCw className="w-4 h-4 mr-2" />
@@ -185,7 +197,6 @@ function UserReports() {
   return (
     <PWALayout title="My Reports" showNotifications={false}>
       <div className="px-4 pb-6">
-        
         {/* Header Section */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-4">
@@ -200,8 +211,10 @@ function UserReports() {
               disabled={refreshing}
               className="h-8"
             >
-              <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-              {refreshing ? 'Refreshing...' : 'Refresh'}
+              <RefreshCw
+                className={`w-4 h-4 mr-2 ${refreshing ? "animate-spin" : ""}`}
+              />
+              {refreshing ? "Refreshing..." : "Refresh"}
             </Button>
           </div>
         </div>
@@ -216,7 +229,9 @@ function UserReports() {
                     <FileText className="w-5 h-5 text-blue-600" />
                   </div>
                   <div>
-                    <p className="text-2xl text-center font-bold text-gray-900">{stats.total}</p>
+                    <p className="text-2xl text-center font-bold text-gray-900">
+                      {stats.total}
+                    </p>
                     <p className="text-xs text-gray-600">Total Reports</p>
                   </div>
                 </div>
@@ -230,7 +245,9 @@ function UserReports() {
                     <CheckCircle className="w-5 h-5 text-green-600" />
                   </div>
                   <div>
-                    <p className="text-2xl text-center font-bold text-gray-900">{stats.resolved}</p>
+                    <p className="text-2xl text-center font-bold text-gray-900">
+                      {stats.resolved}
+                    </p>
                     <p className="text-xs text-gray-600">Resolved</p>
                   </div>
                 </div>
@@ -244,7 +261,9 @@ function UserReports() {
                     <Clock className="w-5 h-5 text-yellow-600" />
                   </div>
                   <div>
-                    <p className="text-2xl text-center font-bold text-gray-900">{stats.pending}</p>
+                    <p className="text-2xl text-center font-bold text-gray-900">
+                      {stats.pending}
+                    </p>
                     <p className="text-xs text-gray-600">Pending</p>
                   </div>
                 </div>
@@ -258,7 +277,9 @@ function UserReports() {
                     <RefreshCw className="w-5 h-5 text-blue-600" />
                   </div>
                   <div>
-                    <p className="text-2xl text-center font-bold text-gray-900">{stats.inProgress}</p>
+                    <p className="text-2xl text-center font-bold text-gray-900">
+                      {stats.inProgress}
+                    </p>
                     <p className="text-xs text-gray-600">In Progress</p>
                   </div>
                 </div>
@@ -272,9 +293,12 @@ function UserReports() {
           <Card>
             <CardContent className="p-8 text-center">
               <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">No Reports Yet</h3>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                No Reports Yet
+              </h3>
               <p className="text-gray-600 mb-6">
-                You haven't submitted any civic issue reports yet. Start by reporting your first issue!
+                You haven't submitted any civic issue reports yet. Start by
+                reporting your first issue!
               </p>
               <Button onClick={() => navigate("/report-issue")}>
                 <PlusCircle className="w-4 h-4 mr-2" />
@@ -285,10 +309,12 @@ function UserReports() {
         ) : (
           <div className="space-y-4">
             {reports.map((report) => (
-              <Card key={report.issue_id} className="hover:shadow-md transition-shadow">
+              <Card
+                key={report.issue_id}
+                className="hover:shadow-md transition-shadow"
+              >
                 <CardContent className="p-6">
                   <div className="flex items-start space-x-4">
-                    
                     {/* Report Icon */}
                     <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
                       {report.image_url ? (
@@ -304,9 +330,11 @@ function UserReports() {
                         <h3 className="text-lg font-semibold text-gray-900 truncate">
                           {report.issue_title || "General Issue"}
                         </h3>
-                        <Badge 
-                          variant="secondary" 
-                          className={`text-xs ml-2 flex items-center space-x-1 ${getStatusColor(report.status)}`}
+                        <Badge
+                          variant="secondary"
+                          className={`text-xs ml-2 flex items-center space-x-1 ${getStatusColor(
+                            report.status
+                          )}`}
                         >
                           {getStatusIcon(report.status)}
                           <span>{report.status || "Submitted"}</span>
@@ -321,9 +349,11 @@ function UserReports() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                         <div className="flex items-center space-x-2 text-gray-500">
                           <Building className="w-4 h-4" />
-                          <span>{report.department || "Department not assigned"}</span>
+                          <span>
+                            {report.department || "Department not assigned"}
+                          </span>
                         </div>
-                        
+
                         <div className="flex items-center space-x-2 text-gray-500">
                           <Calendar className="w-4 h-4" />
                           <span>{formatDate(report.created_at)}</span>
@@ -332,17 +362,20 @@ function UserReports() {
                         <div className="flex items-center space-x-2 text-gray-500">
                           <MapPin className="w-4 h-4" />
                           <span className="truncate">
-                            {report.lat !== "N/A" && report.lng !== "N/A" 
-                              ? `${parseFloat(report.lat).toFixed(4)}, ${parseFloat(report.lng).toFixed(4)}`
-                              : "Location not available"
-                            }
+                            {report.lat !== "N/A" && report.lng !== "N/A"
+                              ? `${parseFloat(report.lat).toFixed(
+                                  4
+                                )}, ${parseFloat(report.lng).toFixed(4)}`
+                              : "Location not available"}
                           </span>
                         </div>
 
                         {report.issue_id && (
                           <div className="flex items-center space-x-2 text-gray-500">
                             <Eye className="w-4 h-4" />
-                            <span className="truncate text-xs">ID: #{report.issue_id}</span>
+                            <span className="truncate text-xs">
+                              ID: #{report.issue_id}
+                            </span>
                           </div>
                         )}
                       </div>
@@ -369,20 +402,22 @@ function UserReports() {
           <Card className="mt-6">
             <CardHeader>
               <CardTitle className="text-lg">Quick Actions</CardTitle>
-              <CardDescription>Manage your reports and submit new ones</CardDescription>
+              <CardDescription>
+                Manage your reports and submit new ones
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Button 
-                onClick={() => navigate("/report-issue")} 
+              <Button
+                onClick={() => navigate("/report-issue")}
                 className="w-full justify-start h-12"
                 variant="outline"
               >
                 <PlusCircle className="w-5 h-5 mr-3" />
                 Report New Issue
               </Button>
-              
-              <Button 
-                onClick={() => navigate("/issues")} 
+
+              <Button
+                onClick={() => navigate("/issues")}
                 className="w-full justify-start h-12"
                 variant="outline"
               >

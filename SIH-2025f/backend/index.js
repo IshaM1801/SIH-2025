@@ -13,7 +13,7 @@ const certificatesRoutes = require("./routes/certificates");
 const employeeRoutes = require("./routes/employee");
 const aiRoutes = require("./routes/aiAllManagerIssues");
 const commentRoutes = require("./routes/commentRoutes");
-
+const announcementRoutes = require("./routes/announcementRoutes");
 const app = express();
 const PORT = process.env.PORT || 5001;
 
@@ -23,26 +23,26 @@ app.use(
     origin: function (origin, callback) {
       // ✅ Allow requests with no origin (mobile apps, Postman, etc.)
       if (!origin) return callback(null, true);
-      
+
       const allowedOrigins = [
-        "http://localhost:5173",                // ✅ Local development
-        "http://127.0.0.1:5173",              // ✅ Alternative localhost
-        "https://fixmycity-opal.vercel.app",   // ✅ Your Vercel deployment
+        "http://localhost:5173", // ✅ Local development
+        "http://127.0.0.1:5173", // ✅ Alternative localhost
+        "https://fixmycity-opal.vercel.app", // ✅ Your Vercel deployment
       ];
-      
+
       // ✅ Check exact matches
       if (allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
-      
+
       // ✅ Allow any Vercel subdomain
-      if (origin.includes('.vercel.app')) {
+      if (origin.includes(".vercel.app")) {
         return callback(null, true);
       }
-      
+
       console.log(`🌐 CORS request from: ${origin}`);
       console.warn(`❌ CORS blocked origin: ${origin}`);
-      callback(new Error('Not allowed by CORS'));
+      callback(new Error("Not allowed by CORS"));
     },
     methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
@@ -101,7 +101,7 @@ app.use("/certificates", certificatesRoutes);
 app.use("/employee", employeeRoutes);
 app.use("/ai", aiRoutes); // ✅ /ai/all-manager-issues
 app.use("/comments", commentRoutes);
-
+app.use("/announcements", announcementRoutes);
 // --- Start server ---
 app.listen(PORT, () =>
   console.log(`🚀 Server running on http://localhost:${PORT}`)

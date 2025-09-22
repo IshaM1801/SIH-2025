@@ -1077,6 +1077,7 @@ const CitizenCommunication = () => {
   const [selectedIssue, setSelectedIssue] = useState(null);
   const [statusFilter, setStatusFilter] = useState("all");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [thumbnailUrls, setThumbnailUrls] = useState({});
   const token = getAuthToken();
 
   useEffect(() => {
@@ -1118,6 +1119,45 @@ const CitizenCommunication = () => {
     fetchIssues();
   }, [fetchIssues]);
 
+  useEffect(() => {
+    // Don't run if there are no issues
+    if (issues.length === 0) return;
+
+    const fetchAllThumbnails = async () => {
+      // Create an array of fetch promises, one for each issue
+      const promises = issues.map(
+        (issue) =>
+          fetch(`${API_BASE_URL}/issues/media/${issue.issue_id}`).then((res) =>
+            res.ok ? res.json() : { media: [] }
+          ) // Handle errors gracefully
+      );
+
+      try {
+        // Wait for all the media fetches to complete
+        const results = await Promise.all(promises);
+
+        const urls = {};
+        results.forEach((result, index) => {
+          const issueId = issues[index].issue_id;
+          const issueLegacyImage = issues[index].image_url;
+
+          // Find the first image in the fetched media array
+          const firstImage = result.media?.find((m) => m.file_type === "image");
+
+          // Use the first image, or fall back to the legacy URL
+          urls[issueId] = firstImage?.file_url || issueLegacyImage;
+        });
+
+        // Set the final map of URLs to state
+        setThumbnailUrls(urls);
+      } catch (err) {
+        console.error("Failed to fetch thumbnails for all issues:", err);
+      }
+    };
+
+    fetchAllThumbnails();
+  }, [issues]); // Dependency array: this effect runs when 'issues' is populated
+
   const filteredIssues =
     statusFilter === "all"
       ? issues
@@ -1133,12 +1173,14 @@ const CitizenCommunication = () => {
 
   return (
     <div className="bg-gray-50 min-h-screen font-sans">
-      <main className="container mx-auto ">
+      <main className="container mx-auto p-4 sm:p-6">
+        {/* =================================== */}
+        {/* ==      HEADER AND FILTERS       == */}
+        {/* =================================== */}
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6">
           <h2 className="text-3xl font-bold text-gray-800 mb-4 sm:mb-0">
             Community Reports
           </h2>
-
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setStatusFilter("all")}
@@ -1171,60 +1213,74 @@ const CitizenCommunication = () => {
           </div>
         </div>
 
+        {/* =================================== */}
+        {/* ==        ISSUES GRID            == */}
+        {/* =================================== */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredIssues.map((issue) => (
-            <div
-              key={issue.issue_id}
-              className="bg-white rounded-xl shadow-md cursor-pointer hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden flex flex-col border border-gray-100"
-              onClick={() => setSelectedIssue(issue)}
-            >
-              {issue.image_url && (
-                <img
-                  src={issue.image_url}
-                  alt={issue.issue_title}
-                  className="w-full h-48 object-cover"
-                />
-              )}
-              <div className="p-6 flex-grow flex flex-col">
-                <div className="flex justify-between items-start mb-3">
-                  <h3 className="text-xl font-bold text-gray-800 line-clamp-2 flex-1">
-                    {issue.issue_title}
-                  </h3>
-                  <StatusPill status={issue.status} />
-                </div>
+          {filteredIssues.map((issue) => {
+            const thumbnailUrl = thumbnailUrls[issue.issue_id];
+            return (
+              <div
+                key={issue.issue_id}
+                className="bg-white rounded-xl shadow-md cursor-pointer hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden flex flex-col border border-gray-100"
+                onClick={() => setSelectedIssue(issue)}
+              >
+                {/* --- Thumbnail Area --- */}
+                {thumbnailUrl ? (
+                  <img
+                    src={thumbnailUrl}
+                    alt={issue.issue_title}
+                    className="w-full h-48 object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-48 bg-gray-200 flex items-center justify-center">
+                    <Loader2 className="text-gray-400" />
+                  </div>
+                )}
 
-                <p className="text-gray-600 text-sm mb-4 line-clamp-3 flex-grow">
-                  {issue.issue_description}
-                </p>
-
-                <div className="space-y-2 pt-4 border-t border-gray-100">
-                  {issue.address_component && (
-                    <div className="flex items-center gap-2 text-sm text-gray-500">
-                      <MapPin size={14} className="flex-shrink-0" />
-                      <span className="truncate">
-                        {issue.address_component}
-                      </span>
-                    </div>
-                  )}
-                  <div className="flex items-center justify-between text-sm text-gray-500">
-                    <div className="flex items-center gap-2">
-                      <User size={14} />
-                      <span>{issue.profiles?.name || "Anonymous"}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Calendar size={14} />
-                      <span>
-                        {new Date(issue.created_at).toLocaleDateString()}
-                      </span>
+                {/* --- Card Content --- */}
+                <div className="p-6 flex-grow flex flex-col">
+                  <div className="flex justify-between items-start mb-3">
+                    <h3 className="text-xl font-bold text-gray-800 line-clamp-2 flex-1">
+                      {issue.issue_title}
+                    </h3>
+                    <StatusPill status={issue.status} />
+                  </div>
+                  <p className="text-gray-600 text-sm mb-4 line-clamp-3 flex-grow">
+                    {issue.issue_description}
+                  </p>
+                  <div className="space-y-2 pt-4 border-t border-gray-100">
+                    {issue.address_component && (
+                      <div className="flex items-center gap-2 text-sm text-gray-500">
+                        <MapPin size={14} className="flex-shrink-0" />
+                        <span className="truncate">
+                          {issue.address_component}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between text-sm text-gray-500">
+                      <div className="flex items-center gap-2">
+                        <User size={14} />
+                        <span>{issue.profiles?.name || "Anonymous"}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Calendar size={14} />
+                        <span>
+                          {new Date(issue.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
-        {filteredIssues.length === 0 && (
+        {/* =================================== */}
+        {/* ==     "NO ISSUES" MESSAGE       == */}
+        {/* =================================== */}
+        {filteredIssues.length === 0 && !isLoading && (
           <div className="text-center py-12">
             <AlertTriangle className="mx-auto mb-4 text-gray-300" size={48} />
             <p className="text-gray-500">
@@ -1234,6 +1290,9 @@ const CitizenCommunication = () => {
         )}
       </main>
 
+      {/* =================================== */}
+      {/* ==    MODAL (Rendered on top)    == */}
+      {/* =================================== */}
       {selectedIssue && (
         <IssueModal
           issue={selectedIssue}

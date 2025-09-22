@@ -966,6 +966,17 @@ const ReportManagementPage = () => {
   const [sentimentData, setSentimentData] = useState(null);
   const [sentimentLoading, setSentimentLoading] = useState(true);
 
+  const TableSkeleton = () => (
+    <div className="space-y-2 p-4">
+      {[...Array(5)].map((_, i) => (
+        <div
+          key={i}
+          className="bg-gray-100 h-16 w-full rounded-lg animate-pulse"
+        ></div>
+      ))}
+    </div>
+  );
+
   // --- Data Fetching ---
   const fetchData = useCallback(async () => {
     try {

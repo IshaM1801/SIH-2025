@@ -71,7 +71,7 @@ import { jwtDecode } from "jwt-decode";
 // --- Configuration ---
 
 const getAuthToken = () => {
-  return localStorage.getItem("employee_token");
+  return localStorage.getItem("token");
 };
 
 const axiosInstance = axios.create({
@@ -1102,32 +1102,39 @@ const CommunityIssues = () => {
   }, []);
 
   const fetchIssues = useCallback(async () => {
+    setIsLoading(true);
+    const token = getAuthToken();
+
+    if (!token) {
+      setError("You are not logged in.");
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      setIsLoading(true);
-      const res = await fetch(`${API_BASE_URL}/issues/dept`, {
+      const res = await fetch("http://localhost:5001/issues", {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        throw new Error(`HTTP error! Status: ${res.status}`);
+      }
 
       const data = await res.json();
-      const allIssues = data.team.flatMap((member) => member.issues);
 
-      const uniqueIssuesMap = {};
-      allIssues.forEach((issue) => {
-        if (!uniqueIssuesMap[issue.issue_id]) {
-          uniqueIssuesMap[issue.issue_id] = issue;
-        }
-      });
-
-      const uniqueIssues = Object.values(uniqueIssuesMap);
-      setIssues(uniqueIssues);
+      if (Array.isArray(data.issues)) {
+        setIssues(data.issues);
+        setError("");
+      } else {
+        throw new Error("Unexpected data format from the server.");
+      }
     } catch (err) {
       console.error("Error fetching issues:", err);
+      setError(err.message || "Failed to fetch issues. Please try again.");
     } finally {
       setIsLoading(false);
     }
-  }, [token]);
+  }, []);
 
   useEffect(() => {
     fetchIssues();

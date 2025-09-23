@@ -554,7 +554,7 @@ const TeamPerformance = ({ teamWorkload }) => {
 
           return (
             <div key={member.name} className="flex items-center gap-4">
-              <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center text-white text-sm font-semibold">
+              <div className="flex-shrink-0 w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
                 {member.name.charAt(0)}
               </div>
               <div className="flex-1">
@@ -568,7 +568,7 @@ const TeamPerformance = ({ teamWorkload }) => {
                 </div>
                 <div className="w-full bg-slate-200 rounded-full h-2">
                   <div
-                    className="bg-gradient-to-r from-blue-500 to-purple-600 h-2 rounded-full transition-all duration-300"
+                    className="bg-red-500 h-2 rounded-full transition-all duration-300"
                     style={{ width: `${percentage}%` }}
                   ></div>
                 </div>

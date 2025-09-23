@@ -20,8 +20,12 @@ import UserAccount from "./pages/UserAccount";
 import Map from "./pages/Map";
 import CertificatesPage from "./pages/CertificatesPage";
 import CommunityIssues from "./pages/CommunityIssues";
-import LiveVehicleMap from './pages/LiveVehicleMap';
-
+import LiveVehicleMap from "./pages/LiveVehicleMap";
+import EmpPWALayout from "./components/ui/EmpPWALayout";
+import HomePage from "./pages/HomePage";
+import AnnouncementsPage from "./pages/AnnouncementsPage";
+import MapPage from "./pages/MapPage";
+import LiveVehiclePage from "./pages/LiveVehiclePage";
 // Protected Route Components
 function AdminProtectedRoute({ children }) {
   const adminUser = localStorage.getItem("adminUser");
@@ -184,6 +188,44 @@ function App() {
             </UserProtectedRoute>
           }
         />
+
+        {/* routes for employee */}
+
+        {/* The EmpPWALayout wraps all pages to provide the consistent UI */}
+        <Route element={<EmpPWALayout />}>
+          <Route
+            path="/home"
+            element={
+              <AdminProtectedRoute>
+                <HomePage />
+              </AdminProtectedRoute>
+            }
+          />
+          <Route
+            path="/map-page"
+            element={
+              <AdminProtectedRoute>
+                <MapPage />
+              </AdminProtectedRoute>
+            }
+          />
+          <Route
+            path="/live-vehicle"
+            element={
+              <AdminProtectedRoute>
+                <LiveVehiclePage />
+              </AdminProtectedRoute>
+            }
+          />
+          <Route
+            path="/announcements"
+            element={
+              <AdminProtectedRoute>
+                <AnnouncementsPage />
+              </AdminProtectedRoute>
+            }
+          />
+        </Route>
 
         {/* Default redirects */}
         <Route path="/" element={<Navigate to="/issues" replace />} />

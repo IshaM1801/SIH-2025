@@ -1,6 +1,11 @@
 ultralytics 
-opencv-python 
+opencv-python
 Flask[async]
 flask-cors 
 requests 
 pandas
+flask
+twilio
+openai
+pyttsx3
+soundfile

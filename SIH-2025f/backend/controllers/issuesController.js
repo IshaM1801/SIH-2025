@@ -724,9 +724,8 @@ const classifyReport = async (req, res) => {
             parts: [
               {
                 text: `Classify civic issue into: ["water","electricity","road","garbage","other"].
-Return JSON with keys: predicted_class, confidence (0-100), priority_level (high|medium|low), source_url.
-
-Image: ${report.image_url}`,
+Return JSON with keys: predicted_class, confidence (0-100), priority_level (high|medium|low).
+                Issue description: "${report.issue_description}".`,
               },
             ],
           },

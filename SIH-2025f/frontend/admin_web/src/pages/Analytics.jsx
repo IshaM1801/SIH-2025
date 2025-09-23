@@ -899,69 +899,7 @@ const ManagerDashboard = () => {
   return (
     <div className="bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen mb-100">
       <div className="p-4 sm:p-6 lg:p-2 max-w-7xl mx-auto">
-        {/* Header */}
-        {/* <header className="mb-8">
-          <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
-            <div>
-              <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-                Manager's Dashboard
-              </h1>
-              <p className="mt-2 text-lg text-slate-600">
-                {today.toLocaleDateString("en-US", {
-                  weekday: "long",
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                })}
-              </p>
-            </div>
-            <div className="text-left lg:text-right">
-              <p className="text-xl font-semibold text-slate-800 capitalize">
-                Welcome back, {dashboardData.managerName}
-              </p>
-            </div>
-          </div>
-        </header> */}
-
         <main className="space-y-8">
-          {/* KPI Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <KpiCard
-              title="Total Issues"
-              value={dashboardData.totalIssues}
-              icon={icons.TotalIssues}
-              color="text-blue-600"
-              bg="bg-blue-100"
-              trend="up"
-              percentage="12"
-            />
-            <KpiCard
-              title="Pending Issues"
-              value={dashboardData.pendingCount}
-              icon={icons.Pending}
-              color="text-yellow-600"
-              bg="bg-yellow-100"
-              trend="down"
-              percentage="8"
-            />
-            <KpiCard
-              title="Resolved Issues"
-              value={dashboardData.resolvedCount}
-              icon={icons.Resolved}
-              color="text-green-600"
-              bg="bg-green-100"
-              trend="up"
-              percentage="15"
-            />
-            <KpiCard
-              title="Team Members"
-              value={dashboardData.teamSize}
-              icon={icons.Team}
-              color="text-indigo-600"
-              bg="bg-indigo-100"
-            />
-          </div>
-
           {/* Analytics Section */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <DoughnutChart

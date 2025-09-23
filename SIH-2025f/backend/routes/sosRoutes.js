@@ -55,12 +55,10 @@ router.post("/trigger", authMiddleware, async (req, res) => {
     const io = req.app.get("socketio");
     io.emit("new-sos-alert", fullAlertPayload);
 
-    res
-      .status(201)
-      .json({
-        message: "SOS alert sent successfully.",
-        alert: fullAlertPayload,
-      });
+    res.status(201).json({
+      message: "SOS alert sent successfully.",
+      alert: fullAlertPayload,
+    });
   } catch (err) {
     console.error("SOS Trigger Error:", err.message);
     res.status(500).json({ error: "Failed to send SOS alert." });
@@ -74,29 +72,14 @@ router.post("/trigger", authMiddleware, async (req, res) => {
  */
 router.get("/active", authMiddleware, async (req, res) => {
   try {
-    // ✅ FIX: Corrected the Supabase join syntax.
-    // This now correctly fetches all sos_alerts columns (*) and the related name and phone from the profiles table.
-    const { data, error } = await supabase
-      .from("sos_alerts")
-      .select(
-        `
-                *,
-                profiles ( name, phone )
-            `
-      )
-      .eq("status", "Active")
-      .order("created_at", { ascending: false });
+    // ✅ FIX: Replaced the failing .select() query with a direct call
+    // to the SQL function 'get_active_sos_alerts'.
+    // This function correctly joins the tables and formats the data.
+    const { data, error } = await supabase.rpc("get_active_sos_alerts");
 
     if (error) throw error;
 
-    // Supabase returns the joined table as a nested object (e.g., 'profiles').
-    // We'll rename it to 'profile' to match the frontend's expectation.
-    const formattedData = data.map((alert) => ({
-      ...alert,
-      profile: alert.profiles, // Rename 'profiles' to 'profile'
-    }));
-
-    res.json(formattedData);
+    res.json(data);
   } catch (err) {
     console.error("Fetch Active SOS Error:", err.message);
     res.status(500).json({ error: "Failed to fetch active alerts." });

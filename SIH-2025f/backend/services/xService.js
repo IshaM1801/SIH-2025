@@ -152,4 +152,58 @@ const postResolvedIssuesJob = async () => {
   }
 };
 
-module.exports = { postResolvedIssuesJob };
+
+// Posting a new issue to X when created 
+const postNewIssueToX = async (issue, imageUrl) => {
+  try{
+    if(!imageUrl){
+      console.log(`Skipping X post for issue ID: ${issue.issue_id} due to missing image URL`);
+      return;
+    }
+    console.log(`Attempting to post new issue ID: ${issue.issue_id} to X`);
+    // fetching the image from its public URL
+    const image = await fetchImageAsBuffer(imageUrl);
+
+    // Upload image to X
+    const mediaId = await twitterClient.v1.uploadMedia(image.buffer, {
+      mimeType: image.mimeType,
+    });
+
+    // 3. Format the timestamp for readability
+    const reportedAt = new Date(issue.created_at).toLocaleString("en-IN", {
+      timeZone: "Asia/Kolkata",
+      dateStyle: "short",
+      timeStyle: "short",
+    });
+
+    // 4. Define official handles to tag based on department
+    const handles = {
+      water: "@mybmcHydEngg",
+      road: "@mybmcRoads",
+      garbage: "@mybmcSwm",
+      electricity: "@mybmcElectric",
+      default: "@mybmc", // Fallback for other departments
+    };
+
+    const departmentHandle = handles[issue.department] || handles.default;
+
+    // Construct the tweet text
+    const tweetText = `New issue reported: ${issue.issue_title}\n\nDescription: ${issue.issue_description} \n\nLocation: ${issue.address_component || 'N/A'}\nReported at: ${reportedAt}\n\nCC: ${departmentHandle}@MumbaiPolice #CivicTech #SmartCity #UrbanIssues`;
+
+    // Post tweet with image
+    const tweet = await twitterClient.v2.tweet({
+      text: tweetText,
+      media: {
+        media_ids: [mediaId],
+      },
+    });
+    
+    const x_post_url = `https://x.com/${process.env.X_ACCOUNT_USERNAME}/status/${tweet.data.id}`;
+    console.log(`Successfully posted new issue ID: ${issue.issue_id} to X at ${x_post_url}`);
+  } 
+  catch(error){
+    console.error(`Failed to post new issue ID: ${issue.issue_id} to X:`, error.message, error);
+  }
+}
+
+module.exports = { postResolvedIssuesJob, postNewIssueToX };

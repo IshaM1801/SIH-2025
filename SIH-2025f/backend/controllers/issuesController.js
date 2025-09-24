@@ -1,5 +1,5 @@
 //issue controller
-
+const { postNewIssueToX } = require("../services/xService");
 const supabase = require("../supabase");
 const axios = require("axios");
 const { sendWhatsAppMessage } = require("../services/whatsappService");
@@ -195,6 +195,13 @@ const createIssueWithLocation = async (req, res) => {
         .insert(mediaToInsert);
 
       if (mediaError) throw mediaError;
+
+      // Get the URL of the first uploaded image
+      const firstImageUrl = mediaToInsert.find(m => m.file_type === 'image')?.file_url;
+      if (firstImageUrl) {
+        // This will run in the background and not delay the API response
+        postNewIssueToX(newIssue, firstImageUrl);
+      }
     }
 
     res.status(201).json({
@@ -286,6 +293,7 @@ const getUserIssues = async (req, res) => {
 };
 
 const { createClient } = require("@supabase/supabase-js");
+// const { postNewIssueToX } = require("../services/xService");
 
 //  Fetch issues only of the logged-in user's department
 // Fetch issues only of the logged-in user's department

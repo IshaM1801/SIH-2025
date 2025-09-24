@@ -5,7 +5,9 @@ import os
 import requests
 import whisper
 import openai
+from dotenv import load_dotenv 
 
+load_dotenv()
 app = Flask(__name__)
 
 # Base public URL for Twilio to call back (e.g., your ngrok domain)

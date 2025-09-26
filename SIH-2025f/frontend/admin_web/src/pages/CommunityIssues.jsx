@@ -728,7 +728,7 @@ const IssueModal = ({ issue, onClose }) => {
     };
     fetchAfterImage();
   }, [issue.issue_id]);
-
+  //ok
   return (
     <PWALayout>
       <div className="fixed inset-0 mt-0 pt-0 bg-black/50 z-50 flex justify-center items-center p-4 animate-in fade-in-0 duration-300">

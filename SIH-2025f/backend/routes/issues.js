@@ -20,6 +20,7 @@ const {
   fetchAddress,
   fetchSentimentalAnalysis,
   getIssueMedia,
+  getAfterImage,
 } = require("../controllers/issuesController");
 
 const {
@@ -57,6 +58,9 @@ router.post(
 );
 //fetch address for frontend
 router.post("/fetch-address", fetchAddress);
+
+//fetch after image
+router.get("/after-image/:issueId", getAfterImage);
 
 //fetch summary of sentimental analysis
 router.get("/summary/:issueId", authMiddleware, fetchSentimentalAnalysis);

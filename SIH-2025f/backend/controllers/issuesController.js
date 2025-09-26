@@ -964,10 +964,48 @@ const fetchSentimentalAnalysis = async (req, res) => {
   }
 };
 
+const getAfterImage = async (req, res) => {
+  try {
+    const { issueId } = req.params;
+
+    // 1. Validate Input
+    if (!issueId) {
+      return res.status(400).json({ error: "Issue ID is required." });
+    }
+
+    // 2. Query the Database
+    const { data, error } = await supabase
+      .from("issue_posts")
+      .select("after_image_url")
+      .eq("issue_id", issueId)
+      .order("created_at", { ascending: false }) // Get the latest post first
+      .limit(1) // We only need the most recent one
+      .single(); // Expects a single row, simplifies response
+
+    // 3. Handle Errors and Responses
+    if (error) {
+      // If no post is found, Supabase returns a 'PGRST116' error.
+      // This is not a server error, so we return a successful response with null.
+      if (error.code === "PGRST116") {
+        return res.status(200).json({ after_image_url: null });
+      }
+      // For all other database errors, throw them to the catch block.
+      throw error;
+    }
+
+    // 4. Send Success Response
+    res.status(200).json({ after_image_url: data.after_image_url });
+  } catch (err) {
+    console.error("Error fetching after image:", err.message);
+    res.status(500).json({ error: "An internal server error occurred." });
+  }
+};
+
 module.exports = {
   getAllIssues,
   getUserIssues,
   assignIssueToEmployee,
+  getAfterImage,
   removeIssueAssignment, // 👈 make sure name matches router
   classifyReport,
   getDeptIssues,

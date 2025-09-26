@@ -1,3 +1,4 @@
+//issues .js
 const express = require("express");
 const router = express.Router();
 const authMiddleware = require("../middleware/authMiddleware");
@@ -17,6 +18,9 @@ const {
   agentUpdateIssue,
   createIssueWithLocation,
   fetchAddress,
+  fetchSentimentalAnalysis,
+  getIssueMedia,
+  getAfterImage,
 } = require("../controllers/issuesController");
 
 const {
@@ -30,9 +34,15 @@ router.get("/user/:userId", authMiddleware, getUserIssues);
 router.post(
   "/create",
   authMiddleware,
-  upload.single("photo"),
+  upload.fields([
+    { name: "photos", maxCount: 10 }, // For multiple images
+    { name: "video", maxCount: 1 }, // For a single video
+  ]),
   createIssueWithLocation
 );
+
+router.get("/media/:issueId", getIssueMedia);
+
 // Fetch single issue by ID
 router.get("/dept/:issue_id", authMiddleware, getDeptIssues);
 
@@ -48,6 +58,12 @@ router.post(
 );
 //fetch address for frontend
 router.post("/fetch-address", fetchAddress);
+
+//fetch after image
+router.get("/after-image/:issueId", getAfterImage);
+
+//fetch summary of sentimental analysis
+router.get("/summary/:issueId", authMiddleware, fetchSentimentalAnalysis);
 
 router.post("/assign-issue", authMiddleware, assignIssueToEmployee);
 router.post("/deassign", authMiddleware, removeIssueAssignment);

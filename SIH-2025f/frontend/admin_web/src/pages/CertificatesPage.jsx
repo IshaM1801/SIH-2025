@@ -17,6 +17,7 @@ import {
   Calendar,
   MapPin
 } from "lucide-react";
+import { API_BASE_URL } from "@/config/api";
 
 const CertificatesPage = () => {
   const navigate = useNavigate();
@@ -46,7 +47,7 @@ const CertificatesPage = () => {
       const token = localStorage.getItem("token");
       if (!token) return;
 
-      const res = await fetch("http://localhost:5001/user/my-reports", {
+      const res = await fetch(`${API_BASE_URL}/user/my-reports`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -104,7 +105,7 @@ const CertificatesPage = () => {
       const token = localStorage.getItem("token");
       if (!token) throw new Error("No access token found");
 
-      const response = await axios.get("http://localhost:5001/certificates", {
+      const response = await axios.get(`${API_BASE_URL}/certificates`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },

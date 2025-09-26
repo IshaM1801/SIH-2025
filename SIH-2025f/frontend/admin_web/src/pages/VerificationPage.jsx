@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { API_BASE_URL } from "../config/api.js";
 
 export default function VerifyPage() {
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -79,7 +80,7 @@ export default function VerifyPage() {
         return;
       }
   
-      const res = await fetch("http://localhost:5001/auth/complete-profile", {
+      const res = await fetch(`${API_BASE_URL}/auth/complete-profile`, {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",

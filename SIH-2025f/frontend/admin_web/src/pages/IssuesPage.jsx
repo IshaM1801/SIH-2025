@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import React, { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -20,19 +20,64 @@ import {
   TrendingUp,
   Award,
   RefreshCw,
+  Megaphone,
+  X as XIcon, // 1. Import X icon for the modal close button
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { API_BASE_URL } from "@/config/api";
+
+// 2. NEW: Announcement Modal Component
+const AnnouncementModal = ({ announcement, onClose }) => {
+  if (!announcement) return null;
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/60 z-50 flex justify-center items-center p-4 animate-in fade-in-0 duration-300"
+      onClick={onClose} // Close modal on overlay click
+    >
+      <Card
+        className="w-full max-w-lg bg-white relative"
+        onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside the card
+      >
+        <CardHeader>
+          <CardTitle className="flex items-start justify-between">
+            <span className="pr-8">{announcement.title}</span>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+              className="absolute top-4 right-4 h-8 w-8"
+            >
+              <XIcon className="h-5 w-5" />
+            </Button>
+          </CardTitle>
+          <CardDescription>
+            Posted by {announcement.manager_name} (
+            {announcement.department_name}) on{" "}
+            {new Date(announcement.created_at).toLocaleDateString()}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">
+            {announcement.content}
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
 
 function IssuesPage() {
   const navigate = useNavigate();
-  const location = useLocation();
   const { t } = useTranslation();
   const [userData, setUserData] = useState(null);
   const [reports, setReports] = useState([]);
+  const [announcements, setAnnouncements] = useState([]);
+  const [selectedAnnouncement, setSelectedAnnouncement] = useState(null); // 3. Add state for modal
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Get user data from localStorage
+  // (No changes to useEffect, fetchData, or helper functions...)
   useEffect(() => {
     const storedUserData = localStorage.getItem("user");
     if (storedUserData) {
@@ -45,54 +90,55 @@ function IssuesPage() {
     }
   }, []);
 
-  // Fetch real reports data
-  useEffect(() => {
-    const fetchReports = async () => {
-      try {
-        const token = localStorage.getItem("token");
-        if (!token) {
-          setError(t("user.auth_required"));
-          return;
-        }
-
-        const res = await fetch("http://localhost:5001/user/my-reports", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (!res.ok) {
-          if (res.status === 401) {
-            setError(t("user.session_expired"));
-            setTimeout(() => navigate("/login"), 2000);
-            return;
-          }
-          throw new Error(`HTTP ${res.status}`);
-        }
-
-        const data = await res.json();
-        console.log("Fetched dashboard data:", data);
-
-        // Handle both formats: array directly or { reports: [...] }
-        const processed = (Array.isArray(data) ? data : data.reports || []).map(
-          (report) => ({
-            ...report,
-            lat: report.latitude || report.lat || "N/A",
-            lng: report.longitude || report.lng || "N/A",
-          })
-        );
-
-        setReports(processed);
-        setError(null);
-      } catch (err) {
-        console.error("Error fetching reports:", err);
-        setError(err.message);
-      } finally {
-        setLoading(false);
+  const fetchData = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        setError(t("user.auth_required"));
+        return;
       }
-    };
+      const [reportsRes, announcementsRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/user/my-reports`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch(`${API_BASE_URL}/announcements`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+      ]);
+      if (!reportsRes.ok) {
+        if (reportsRes.status === 401) {
+          setError(t("user.session_expired"));
+          setTimeout(() => navigate("/login"), 2000);
+        }
+        throw new Error(`HTTP ${reportsRes.status}`);
+      }
+      const reportsData = await reportsRes.json();
+      const processedReports = (
+        Array.isArray(reportsData) ? reportsData : reportsData.reports || []
+      ).map((report) => ({
+        ...report,
+        lat: report.latitude || report.lat || "N/A",
+        lng: report.longitude || report.lng || "N/A",
+      }));
+      setReports(processedReports);
+      if (announcementsRes.ok) {
+        const announcementsData = await announcementsRes.json();
+        setAnnouncements(announcementsData);
+      } else {
+        console.warn("Could not fetch announcements:", announcementsRes.status);
+      }
+      setError(null);
+    } catch (err) {
+      console.error("Error fetching dashboard data:", err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [navigate, t]);
 
-    fetchReports();
-  }, [navigate]);
-
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
   const getUserName = () => {
     if (userData?.user_metadata?.email) {
       const email = userData.user_metadata.email;
@@ -111,7 +157,6 @@ function IssuesPage() {
     return t("user.user");
   };
 
-  // ✅ Calculate real dashboard stats from fetched reports
   const getDashboardStats = () => {
     if (loading || !reports.length) {
       return {
@@ -121,25 +166,18 @@ function IssuesPage() {
         inProgressReports: 0,
       };
     }
-
     const total = reports.length;
-    const resolved = reports.filter(
-      (r) =>
-        r.status?.toLowerCase() === "resolved" ||
-        r.status?.toLowerCase() === "completed"
+    const resolved = reports.filter((r) =>
+      ["resolved", "completed"].includes(r.status?.toLowerCase())
     ).length;
-    const pending = reports.filter(
-      (r) =>
-        r.status?.toLowerCase() === "pending" ||
-        r.status?.toLowerCase() === "submitted"
+    const pending = reports.filter((r) =>
+      ["pending", "submitted"].includes(r.status?.toLowerCase())
     ).length;
-    const inProgress = reports.filter(
-      (r) =>
-        r.status?.toLowerCase() === "in_progress" ||
-        r.status?.toLowerCase() === "in progress" ||
-        r.status?.toLowerCase() === "assigned"
+    const inProgress = reports.filter((r) =>
+      ["in_progress", "in progress", "assigned"].includes(
+        r.status?.toLowerCase()
+      )
     ).length;
-
     return {
       totalReports: total,
       pendingReports: pending,
@@ -150,10 +188,8 @@ function IssuesPage() {
 
   const dashboardStats = getDashboardStats();
 
-  // ✅ Get recent issues from real data (last 3 reports)
   const getRecentIssues = () => {
     if (!reports.length) return [];
-
     return reports
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
       .slice(0, 3)
@@ -178,12 +214,10 @@ function IssuesPage() {
 
   const formatRelativeDate = (dateString) => {
     if (!dateString) return t("user.recently");
-
     const date = new Date(dateString);
     const now = new Date();
     const diffTime = Math.abs(now - date);
     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
     if (diffDays === 0) return t("user.today");
     if (diffDays === 1) return t("user.yesterday");
     if (diffDays < 7) return t("user.days_ago", { count: diffDays });
@@ -193,14 +227,12 @@ function IssuesPage() {
   };
 
   const getPriorityFromDepartment = (department) => {
-    // Simple logic to assign priority based on department
     const highPriorityDepts = ["Emergency", "Fire", "Police", "Medical"];
     const mediumPriorityDepts = [
       "Public Works",
       "Transportation",
       "Infrastructure",
     ];
-
     if (highPriorityDepts.some((dept) => department?.includes(dept)))
       return t("user.high");
     if (mediumPriorityDepts.some((dept) => department?.includes(dept)))
@@ -240,23 +272,20 @@ function IssuesPage() {
     }
   };
 
-  // Show loading state
+  // (No changes to loading/error JSX)
   if (loading) {
     return (
       <PWALayout title={t("app.title")} showNotifications={true}>
-        <div className="px-4 pb-6">
-          <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <RefreshCw className="w-8 h-8 text-gray-400 mx-auto mb-3 animate-spin" />
-              <div className="text-gray-500">{t("user.loading_dashboard")}</div>
-            </div>
+        <div className="px-4 pb-6 flex items-center justify-center h-64">
+          <div className="text-center">
+            <RefreshCw className="w-8 h-8 text-gray-400 mx-auto mb-3 animate-spin" />
+            <div className="text-gray-500">{t("user.loading_dashboard")}</div>
           </div>
         </div>
       </PWALayout>
     );
   }
 
-  // Show error state
   if (error) {
     return (
       <PWALayout title={t("app.title")} showNotifications={true}>
@@ -269,8 +298,7 @@ function IssuesPage() {
               </h3>
               <p className="text-red-700 mb-4">{error}</p>
               <Button onClick={() => window.location.reload()}>
-                <RefreshCw className="w-4 h-4 mr-2" />
-                {t("user.try_again")}
+                <RefreshCw className="w-4 h-4 mr-2" /> {t("user.try_again")}
               </Button>
             </CardContent>
           </Card>
@@ -290,7 +318,39 @@ function IssuesPage() {
           <p className="text-gray-600">{t("user.track_reports")}</p>
         </div>
 
-        {/* ✅ Real Stats Cards */}
+        {/* Announcements Card */}
+        {announcements.length > 0 && (
+          <Card className="mb-6 bg-blue-50 border-blue-200">
+            <CardHeader>
+              <CardTitle className="flex items-center text-blue-900">
+                <Megaphone className="w-5 h-5 mr-3" />
+                Recent Announcements
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              {announcements.slice(0, 2).map((ann, index) => (
+                // 4. Wrap announcement in a button to make it clickable
+                <button
+                  key={ann.announcement_id}
+                  onClick={() => setSelectedAnnouncement(ann)}
+                  className={`w-full text-left p-3 rounded-md hover:bg-blue-100 transition-colors ${
+                    index > 0 ? "pt-3 border-t border-blue-200" : ""
+                  }`}
+                >
+                  <p className="font-semibold text-blue-800">{ann.title}</p>
+                  <p className="text-blue-700 mt-1 line-clamp-2">
+                    {ann.content}
+                  </p>
+                  <p className="text-xs text-blue-600 mt-2">
+                    {new Date(ann.created_at).toLocaleDateString()}
+                  </p>
+                </button>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* (The rest of your page JSX is unchanged) */}
         <div className="grid grid-cols-2 gap-4 mb-6">
           <Card>
             <CardContent className="p-4">
@@ -309,7 +369,6 @@ function IssuesPage() {
               </div>
             </CardContent>
           </Card>
-
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center space-x-3">
@@ -327,7 +386,6 @@ function IssuesPage() {
               </div>
             </CardContent>
           </Card>
-
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center space-x-3">
@@ -345,7 +403,6 @@ function IssuesPage() {
               </div>
             </CardContent>
           </Card>
-
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center space-x-3">
@@ -364,8 +421,6 @@ function IssuesPage() {
             </CardContent>
           </Card>
         </div>
-
-        {/* ✅ Certificates Section - Only show if user has resolved reports */}
         {dashboardStats.resolvedReports > 0 && (
           <Card className="mb-6">
             <CardContent className="p-6">
@@ -388,11 +443,9 @@ function IssuesPage() {
                   variant="outline"
                   className="flex items-center space-x-2 h-10"
                 >
-                  <Award className="w-4 h-4" />
-                  <span>{t("common.view")}</span>
+                  <Award className="w-4 h-4" /> <span>{t("common.view")}</span>
                 </Button>
               </div>
-
               <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
                 <p className="text-sm text-green-700 flex items-center">
                   <CheckCircle className="w-4 h-4 mr-2" />
@@ -406,8 +459,6 @@ function IssuesPage() {
             </CardContent>
           </Card>
         )}
-
-        {/* Quick Actions */}
         <Card className="mb-6">
           <CardHeader>
             <CardTitle className="text-lg">{t("user.quick_actions")}</CardTitle>
@@ -419,22 +470,18 @@ function IssuesPage() {
               className="w-full justify-start h-12"
               variant="outline"
             >
-              <PlusCircle className="w-5 h-5 mr-3" />
+              <PlusCircle className="w-5 h-5 mr-3" />{" "}
               {t("user.report_new_issue")}
             </Button>
-
             <Button
               onClick={() => navigate("/my-reports")}
               className="w-full justify-start h-12"
               variant="outline"
             >
-              <FileText className="w-5 h-5 mr-3" />
-              {t("user.view_my_reports")}
+              <FileText className="w-5 h-5 mr-3" /> {t("user.view_my_reports")}
             </Button>
           </CardContent>
         </Card>
-
-        {/* ✅ Real Recent Issues */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">{t("user.recent_issues")}</CardTitle>
@@ -450,7 +497,6 @@ function IssuesPage() {
                   <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
                     <AlertCircle className="w-5 h-5 text-gray-600" />
                   </div>
-
                   <div className="flex-1 min-w-0">
                     <h3 className="font-medium text-gray-900 truncate">
                       {issue.title}
@@ -478,7 +524,6 @@ function IssuesPage() {
                       </Badge>
                     </div>
                   </div>
-
                   <div className="text-xs text-gray-500 flex-shrink-0">
                     {issue.date}
                   </div>
@@ -500,6 +545,12 @@ function IssuesPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* 5. Conditionally render the modal */}
+      <AnnouncementModal
+        announcement={selectedAnnouncement}
+        onClose={() => setSelectedAnnouncement(null)}
+      />
     </PWALayout>
   );
 }

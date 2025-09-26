@@ -1,4 +1,4 @@
-import React from "react"; // No longer needs useState
+import React from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from 'react-i18next';
 import {
@@ -12,19 +12,16 @@ import {
   MessageSquare,
   ChevronLeft,
   Map as MapIcon,
+  MapPin, // Added for the vehicle map
   ChevronRight,
   LogOut,
   LineChart,
 } from "lucide-react";
 
-// 1. Component now accepts isOpen and setIsOpen as props from the Layout
 const Sidebar = ({ adminData, isOpen, setIsOpen }) => {
   const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
-
-  // 2. The internal state for isOpen has been REMOVED from this component.
-  // const [isOpen, setIsOpen] = useState(true); // <-- This line is deleted.
 
   const getAdminName = () => {
     if (adminData?.name) return adminData.name;
@@ -59,6 +56,8 @@ const Sidebar = ({ adminData, isOpen, setIsOpen }) => {
       items: [
         { icon: FileText, label: t('nav.report_management'), path: "/reports" },
         { icon: MapIcon, label: t('nav.map'), path: "/map" },
+        // --- 2. ADD THE NEW LINK OBJECT HERE ---
+        { icon: MapPin, label: t('Live Vehicle'), path: "/live-vehicle-map" },
         { icon: BarChart3, label: t('nav.analytics'), path: "/dashboard" },
       ],
     },
@@ -132,7 +131,6 @@ const Sidebar = ({ adminData, isOpen, setIsOpen }) => {
               </div>
             </div>
           )}
-          {/* 3. This button now uses the setIsOpen prop to change the state in the parent Layout component */}
           <button
             onClick={() => setIsOpen(!isOpen)}
             className="p-2 ml-2 rounded-lg hover:bg-gray-100"

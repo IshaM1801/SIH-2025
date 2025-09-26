@@ -1,8 +1,11 @@
+//issue controller
+const { postNewIssueToX } = require("../services/xService");
 const supabase = require("../supabase");
 const axios = require("axios");
 const { sendWhatsAppMessage } = require("../services/whatsappService");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const fetch = require("node-fetch");
 
 // ✅ Create a shared reverse geocoding function
 const reverseGeocode = async (latitude, longitude) => {
@@ -60,12 +63,42 @@ async function urlToGenerativePart(url) {
   }
 }
 
+// A helper function to upload a file to Supabase Storage
+const uploadFileToSupabase = async (file, folder) => {
+  // Use a unique file path to prevent naming conflicts
+  const filePath = `${folder}/${Date.now()}-${file.originalname}`;
+
+  // Upload the file's buffer to a bucket named 'media'
+  const { error } = await supabase.storage
+    .from("issue-media")
+    .upload(filePath, file.buffer, {
+      contentType: file.mimetype,
+      upsert: true,
+    });
+
+  if (error) {
+    throw new Error(`Failed to upload file: ${error.message}`);
+  }
+
+  // Get the public URL for the newly uploaded file
+  const { data } = supabase.storage.from("issue-media").getPublicUrl(filePath);
+  return data.publicUrl;
+};
+
 const createIssueWithLocation = async (req, res) => {
   try {
-    const { issue_title, issue_description, department, latitude, longitude } =
-      req.body;
+    const {
+      issue_title,
+      issue_description,
+      is_anonymous,
+      latitude,
+      longitude,
+    } = req.body;
     const user = req.user;
     const created_by = user.id;
+
+    const images = req.files?.photos || [];
+    const video = req.files?.video?.[0] || null;
 
     if (!issue_title || !issue_description) {
       return res.status(400).json({ error: "Missing required fields" });
@@ -79,9 +112,8 @@ const createIssueWithLocation = async (req, res) => {
       let clientIp =
         req.headers["x-forwarded-for"]?.split(",")[0] ||
         req.socket?.remoteAddress;
-
       if (!clientIp || clientIp === "::1" || clientIp === "127.0.0.1") {
-        clientIp = "8.8.8.8"; // fallback for localhost/dev
+        clientIp = "8.8.8.8";
       }
 
       try {
@@ -96,69 +128,21 @@ const createIssueWithLocation = async (req, res) => {
       }
     }
 
-    // 2️⃣ Reverse geocode with OpenCage
+    // 2️⃣ Reverse geocode address
     let formattedAddress = "Unknown location";
     if (lat && lng) {
-      try {
-        const openCageKey = process.env.OPENCAGE_KEY;
-        const geoCodeRes = await axios.get(
-          `https://api.opencagedata.com/geocode/v1/json?q=${lat}+${lng}&key=${openCageKey}&no_annotations=1`
-        );
-
-        if (geoCodeRes.data?.results?.length > 0) {
-          const c = geoCodeRes.data.results[0].components;
-          formattedAddress = [
-            c.suburb || c.neighbourhood || c.village,
-            c.city || c.town || c.village,
-            c.state,
-            c.country,
-          ]
-            .filter(Boolean)
-            .join(", ");
-        }
-      } catch (geoErr) {
-        console.warn("⚠️ Reverse geocode failed:", geoErr.message);
-      }
+      formattedAddress = await reverseGeocode(lat, lng);
     }
 
-    // 3️⃣ Handle image upload
-    let imageUrl = null;
-    if (req.file) {
-      try {
-        const file = req.file;
-        const fileExt = file.originalname.split(".").pop();
-        const fileName = `issues/${Date.now()}.${fileExt}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from("issue-photos")
-          .upload(fileName, file.buffer, {
-            cacheControl: "3600",
-            upsert: false,
-            contentType: file.mimetype,
-          });
-
-        if (uploadError) throw uploadError;
-
-        const { data: publicData } = supabase.storage
-          .from("issue-photos")
-          .getPublicUrl(fileName);
-
-        imageUrl = publicData.publicUrl;
-      } catch (uploadErr) {
-        console.error("⚠️ Image upload failed:", uploadErr.message);
-      }
-    }
-
-    // 4️⃣ Insert issue into Supabase
-    const { data, error } = await supabase
+    // 3️⃣ Insert the core issue first to get the issue_id
+    const { data: newIssue, error: issueError } = await supabase
       .from("issues")
       .insert([
         {
           issue_title,
           issue_description,
           created_by,
-          department: department || null,
-          image_url: imageUrl,
+          //is_anonymous: is_anonymous === "true",
           latitude: lat,
           longitude: lng,
           address_component: formattedAddress,
@@ -167,12 +151,63 @@ const createIssueWithLocation = async (req, res) => {
       .select()
       .single();
 
-    if (error) throw error;
+    if (issueError) throw issueError;
+
+    const issueId = newIssue.issue_id;
+
+    // 4️⃣ Upload and insert media files
+    const mediaToInsert = [];
+    const uploadPromises = [];
+
+    // Handle images
+    if (images.length > 0) {
+      images.forEach((image) => {
+        uploadPromises.push(
+          uploadFileToSupabase(image, "issues/images").then((url) => {
+            mediaToInsert.push({
+              issue_id: issueId,
+              file_url: url,
+              file_type: "image",
+            });
+          })
+        );
+      });
+    }
+
+    // Handle video
+    if (video) {
+      uploadPromises.push(
+        uploadFileToSupabase(video, "issues/videos").then((url) => {
+          mediaToInsert.push({
+            issue_id: issueId,
+            file_url: url,
+            file_type: "video",
+          });
+        })
+      );
+    }
+
+    await Promise.all(uploadPromises);
+
+    if (mediaToInsert.length > 0) {
+      const { error: mediaError } = await supabase
+        .from("issue_media")
+        .insert(mediaToInsert);
+
+      if (mediaError) throw mediaError;
+
+      // Get the URL of the first uploaded image
+      const firstImageUrl = mediaToInsert.find(m => m.file_type === 'image')?.file_url;
+      if (firstImageUrl) {
+        // This will run in the background and not delay the API response
+        postNewIssueToX(newIssue, firstImageUrl);
+      }
+    }
 
     res.status(201).json({
       success: true,
       message: "Issue created successfully",
-      issue: data,
+      issue: newIssue,
       location: {
         latitude: lat,
         longitude: lng,
@@ -182,6 +217,33 @@ const createIssueWithLocation = async (req, res) => {
   } catch (err) {
     console.error("createIssueWithLocation error:", err);
     res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+const getIssueMedia = async (req, res) => {
+  const { issueId } = req.params;
+
+  try {
+    const { data: media, error } = await supabase
+      .from("issue_media")
+      .select("file_url, file_type")
+      .eq("issue_id", issueId);
+
+    if (error) {
+      console.error("Supabase media fetch error:", error);
+      return res.status(500).json({ error: "Failed to fetch issue media." });
+    }
+
+    if (!media || media.length === 0) {
+      return res
+        .status(404)
+        .json({ message: "No media found for this issue.", media: [] });
+    }
+
+    return res.status(200).json({ media });
+  } catch (err) {
+    console.error("getIssueMedia error:", err);
+    return res.status(500).json({ error: "Internal server error." });
   }
 };
 
@@ -231,6 +293,7 @@ const getUserIssues = async (req, res) => {
 };
 
 const { createClient } = require("@supabase/supabase-js");
+// const { postNewIssueToX } = require("../services/xService");
 
 //  Fetch issues only of the logged-in user's department
 // Fetch issues only of the logged-in user's department
@@ -400,6 +463,26 @@ const getDeptIssues = async (req, res) => {
   }
 };
 
+/**
+ * @param {string} url The public URL of the image.
+ * @returns {Promise<Buffer>} A promise that resolves with the image data as a Buffer.
+ */
+const fetchImageAsBuffer = async (url) => {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(
+        `Failed to fetch image. Status: ${response.status} ${response.statusText}`
+      );
+    }
+    const arrayBuffer = await response.arrayBuffer();
+    return Buffer.from(arrayBuffer);
+  } catch (error) {
+    console.error(`Error fetching image from ${url}:`, error.message);
+    throw error;
+  }
+};
+
 const agentUpdateIssue = async (req, res) => {
   console.log("🟢 agentUpdateIssue invoked");
   try {
@@ -415,9 +498,10 @@ const agentUpdateIssue = async (req, res) => {
     console.log(`➡️ Received update for issue_id: ${issue_id}`);
 
     // 2. Upload "Fixed" Image to Supabase Storage
+    // **NOTE: Changed bucket to 'issue-resolutions' as per previous discussion.**
     const fileName = `resolved-${issue_id}-${Date.now()}`;
     const { error: uploadError } = await supabase.storage
-      .from("issue-photos")
+      .from("issue-resolutions")
       .upload(fileName, fixedImageFile.buffer, {
         contentType: fixedImageFile.mimetype,
       });
@@ -428,7 +512,7 @@ const agentUpdateIssue = async (req, res) => {
     }
 
     const { data: urlData } = supabase.storage
-      .from("issue-photos")
+      .from("issue-resolutions")
       .getPublicUrl(fileName);
     const fixedImageUrl = urlData.publicUrl;
     console.log("✅ 'Fixed' image uploaded:", fixedImageUrl);
@@ -446,10 +530,9 @@ const agentUpdateIssue = async (req, res) => {
     }
     console.log("✅ Fetched original issue:", originalIssue.issue_title);
 
-    // 4. AI Verification with Gemini (NEW RELIABLE METHOD)
+    // 4. AI Verification with Gemini
     console.log("🤖 Downloading images to send to Gemini...");
 
-    // Use our helper function to get the image data for both images
     const originalImagePart = await urlToGenerativePart(
       originalIssue.image_url
     );
@@ -465,13 +548,13 @@ const agentUpdateIssue = async (req, res) => {
           parts: [
             {
               text: `You are an AI verification agent for a civic issue platform. Your task is to determine if a reported issue has been resolved based on two images and its description.
-          
-          Issue Title: "${originalIssue.issue_title}"
-          Issue Description: "${originalIssue.issue_description}"
+              
+              Issue Title: "${originalIssue.issue_title}"
+              Issue Description: "${originalIssue.issue_description}"
 
-          Analyze the 'Original Problem Image' (first image) and compare it to the 'Submitted Fix Image' (second image). Decide on a new status: 'resolved' or 'in progress' or 'pending'.
-          
-          Return ONLY a valid JSON object with the keys: "new_status" and "justification".`,
+              Analyze the 'Original Problem Image' (first image) and compare it to the 'Submitted Fix Image' (second image). Decide on a new status: 'resolved' or 'in progress' or 'pending'.
+              
+              Return ONLY a valid JSON object with the keys: "new_status" and "justification" and "post_text" which should be the text of the post to be posted on X.`,
             },
             originalImagePart,
             fixedImagePart,
@@ -482,19 +565,15 @@ const agentUpdateIssue = async (req, res) => {
 
     const result = await model.generateContent(prompt);
     const responseText = result.response.text();
-    console.log("📩 Gemini raw response:", responseText);
-
     const aiResponse = JSON.parse(responseText.replace(/```json\n?|```/g, ""));
+
     console.log("✅ Parsed AI response:", aiResponse);
 
-    // 5. Update Issue in Database with AI's Verdict
+    // 5. Update Issue Status in the 'issues' table
     const { data: updatedIssue, error: updateError } = await supabase
       .from("issues")
       .update({
         status: aiResponse.new_status,
-        resolved_image_url: fixedImageUrl,
-        // resolution_notes: aiResponse.justification,
-        // resolved_at: new Date().toISOString(),
       })
       .eq("issue_id", issue_id)
       .select("issue_id, issue_title, created_by")
@@ -506,7 +585,32 @@ const agentUpdateIssue = async (req, res) => {
     }
     console.log("✅ Issue status updated in DB to:", aiResponse.new_status);
 
-    // 7. Send Success Response to Frontend
+    // 6. Conditionally Create a Record in 'issue_posts'
+    if (aiResponse.new_status === "resolved" || "in progress") {
+      const { data, error } = await supabase
+        .from("issue_posts")
+        .insert([
+          {
+            issue_id: originalIssue.issue_id,
+            ai_generated_text: aiResponse.post_text,
+            before_image_url: originalIssue.image_url,
+            after_image_url: fixedImageUrl,
+            posted_to_x: false, // This is a flag for the background job
+          },
+        ])
+        .select();
+
+      if (error) {
+        console.error(
+          "❌ Supabase insert into issue_posts error:",
+          error.message
+        );
+        throw new Error("Failed to create post record.");
+      }
+      console.log("✅ Post record created in 'issue_posts'. Ready for X.");
+    }
+
+    // 7. Send Success Response
     res.json({
       success: true,
       message: "AI analysis complete and issue updated.",
@@ -525,6 +629,7 @@ const agentUpdateIssue = async (req, res) => {
       .json({ error: err.message || "An internal server error occurred." });
   }
 };
+
 // Add this function to issuesController.js
 const updateIssueStatus = async (req, res) => {
   const { issueId } = req.params;
@@ -627,9 +732,8 @@ const classifyReport = async (req, res) => {
             parts: [
               {
                 text: `Classify civic issue into: ["water","electricity","road","garbage","other"].
-Return JSON with keys: predicted_class, confidence (0-100), priority_level (high|medium|low), source_url.
-
-Image: ${report.image_url}`,
+Return JSON with keys: predicted_class, confidence (0-100), priority_level (high|medium|low).
+                Issue description: "${report.issue_description}".`,
               },
             ],
           },
@@ -822,10 +926,86 @@ const fetchAddress = async (req, res) => {
   }
 };
 
+const fetchSentimentalAnalysis = async (req, res) => {
+  // Must accept req and res
+  try {
+    // 🔑 MODIFICATION: Extract issueId from req.params, not req.query
+    const issueId = req.params.issueId; // <--- Changed from req.query.issueId
+
+    if (!issueId) {
+      // This shouldn't happen with the route defined as /:issueId, but is good practice
+      return res.status(400).json({ error: "Missing issueId in URL path." });
+    }
+
+    const { data, error } = await supabase
+      .from("issue_posts")
+      .select("sentiment_summary, overall_sentiment")
+      .eq("issue_id", issueId)
+      .maybeSingle();
+
+    console.log(`🔍 Sentiment analysis lookup for issue ID ${issueId}:`, data);
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data) {
+      return res.status(404).json({ error: "Sentiment data not found." });
+    }
+
+    // Send the data as a JSON response (standard Express pattern)
+    return res.json({
+      summary: data.sentiment_summary,
+      sentiment: data.overall_sentiment,
+    });
+  } catch (err) {
+    console.error("fetchSentimentalAnalysis error:", err);
+    return res.status(500).json({ error: "Internal server error." });
+  }
+};
+
+const getAfterImage = async (req, res) => {
+  try {
+    const { issueId } = req.params;
+
+    // 1. Validate Input
+    if (!issueId) {
+      return res.status(400).json({ error: "Issue ID is required." });
+    }
+
+    // 2. Query the Database
+    const { data, error } = await supabase
+      .from("issue_posts")
+      .select("after_image_url")
+      .eq("issue_id", issueId)
+      .order("created_at", { ascending: false }) // Get the latest post first
+      .limit(1) // We only need the most recent one
+      .single(); // Expects a single row, simplifies response
+
+    // 3. Handle Errors and Responses
+    if (error) {
+      // If no post is found, Supabase returns a 'PGRST116' error.
+      // This is not a server error, so we return a successful response with null.
+      if (error.code === "PGRST116") {
+        return res.status(200).json({ after_image_url: null });
+      }
+      // For all other database errors, throw them to the catch block.
+      throw error;
+    }
+
+    // 4. Send Success Response
+    res.status(200).json({ after_image_url: data.after_image_url });
+  } catch (err) {
+    console.error("Error fetching after image:", err.message);
+    res.status(500).json({ error: "An internal server error occurred." });
+  }
+};
+
 module.exports = {
   getAllIssues,
   getUserIssues,
   assignIssueToEmployee,
+  getAfterImage,
   removeIssueAssignment, // 👈 make sure name matches router
   classifyReport,
   getDeptIssues,
@@ -833,4 +1013,6 @@ module.exports = {
   agentUpdateIssue,
   createIssueWithLocation,
   fetchAddress,
+  fetchSentimentalAnalysis,
+  getIssueMedia,
 };

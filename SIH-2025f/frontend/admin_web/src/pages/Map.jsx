@@ -7,6 +7,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { useTranslation } from 'react-i18next';
+import { API_BASE_URL } from "@/config/api";
 
 // --- CUSTOM MARKER ICONS LOGIC ---
 // NOTE: Make sure you have the marker SVG files in your `public/icons/` directory.
@@ -136,7 +137,7 @@ export default function CivicIssueMap() {
     }
 
     try {
-      const res = await fetch("http://localhost:5001/issues/dept", {
+      const res = await fetch(`${API_BASE_URL}/issues/dept`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);

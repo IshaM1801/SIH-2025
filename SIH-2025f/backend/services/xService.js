@@ -188,7 +188,7 @@ const postNewIssueToX = async (issue, imageUrl) => {
     const departmentHandle = handles[issue.department] || handles.default;
 
     // Construct the tweet text
-    const tweetText = `New issue reported: ${issue.issue_title}\n\nDescription: ${issue.issue_description} \n\nLocation: ${issue.address_component || 'N/A'}\nReported at: ${reportedAt}\n\nCC: ${departmentHandle}@MumbaiPolice #CivicTech #SmartCity #UrbanIssues`;
+    const tweetText = `New issue reported: ${issue.issue_title}\n\nDescription: ${issue.issue_description} \n\nLocation: ${issue.address_component || 'N/A'}\nReported at: ${reportedAt}\n\nCC: ${departmentHandle}@MumbaPolice @MumbaGovernment #CivicTech #SmartCity #UrbanIssues`;
 
     // Post tweet with image
     const tweet = await twitterClient.v2.tweet({
